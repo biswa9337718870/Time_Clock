@@ -2,7 +2,7 @@ import http.server
 import json
 import os
 
-PORT = 8080
+PORT = int(os.environ.get('PORT', 8080))
 DB_FILE = 'database.json'
 
 class ApexFlowHandler(http.server.SimpleHTTPRequestHandler):
