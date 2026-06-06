@@ -1,0 +1,81 @@
+{
+  "attendance": [
+    {
+      "empId": "EMP001",
+      "date": "2026-06-05",
+      "checkIn": "09:02",
+      "checkOut": "18:05",
+      "status": "Present"
+    },
+    {
+      "empId": "EMP001",
+      "date": "2026-06-04",
+      "checkIn": "09:31",
+      "checkOut": "18:15",
+      "status": "Late"
+    }
+  ],
+  "booted": true,
+  "emails": [],
+  "employees": [
+    {
+      "id": "EMP000",
+      "name": "HR Administrator",
+      "email": "admin@company.com",
+      "password": "Admin@1234",
+      "role": "Admin",
+      "dept": "HR",
+      "designation": "HR Manager",
+      "salary": 9000,
+      "otRate": 45,
+      "leaveBalance": {
+        "Annual": 21,
+        "Sick": 10,
+        "Casual": 7
+      }
+    },
+    {
+      "id": "EMP001",
+      "name": "Alex Johnson",
+      "email": "employee@company.com",
+      "password": "Emp@1234",
+      "role": "Employee",
+      "dept": "Engineering",
+      "designation": "Software Engineer",
+      "salary": 6000,
+      "otRate": 30,
+      "leaveBalance": {
+        "Annual": 21,
+        "Sick": 10,
+        "Casual": 7
+      }
+    }
+  ],
+  "geofence": {
+    "lat": null,
+    "lng": null,
+    "radius": 200
+  },
+  "holidays": [
+    {
+      "date": "2026-01-01",
+      "name": "New Year"
+    },
+    {
+      "date": "2026-08-15",
+      "name": "Independence Day"
+    },
+    {
+      "date": "2026-10-02",
+      "name": "Gandhi Jayanti"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas"
+    }
+  ],
+  "leaves": [],
+  "notifications": [],
+  "outside_work": [],
+  "payrolls": []
+}
