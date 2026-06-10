@@ -110,7 +110,10 @@ async function syncCacheToServer() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(DB_Cache)
     });
-    if (!res.ok) console.warn("Failed to sync database to server.");
+     if (!res.ok) {
+      console.warn("Failed to sync database to server.");
+      setServerStatus(false);
+    }
   } catch (err) {
     console.warn("Database server connection lost.");
     setServerStatus(false);
@@ -240,6 +243,24 @@ async function initDB() {
   // First boot check in IndexedDB
   const booted = DB.get('booted');
   if (booted) return;
+    // Try to load database.json from the repository root as the seed
+  try {
+    const res = await fetch('database.json');
+    if (res.ok) {
+      const staticData = await res.json();
+      if (staticData && typeof staticData === 'object' && staticData.employees) {
+        for (const key in staticData) {
+          DB.set(key, staticData[key]);
+        }
+        DB.set('booted', true);
+        console.log("Database initialized from static database.json seed.");
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not fetch static database.json seed. Falling back to default data.", err);
+  }
+
 
   const adminId = 'EMP000';
   const empId   = 'EMP001';
@@ -1767,6 +1788,39 @@ function importDatabase(file) {
   };
   reader.readAsText(file);
 }
+async function syncWithRepository() {
+  if (!confirm("Are you sure you want to sync your database with the repository's database.json? This will overwrite your current browser data.")) {
+    return;
+  }
+  try {
+    const res = await fetch('database.json');
+    if (!res.ok) {
+      throw new Error(`Server returned status ${res.status}`);
+    }
+    const staticData = await res.json();
+    const requiredKeys = ['employees', 'attendance', 'leaves', 'geofence'];
+    const missingKeys = requiredKeys.filter(k => !(k in staticData));
+    if (missingKeys.length > 0) {
+      throw new Error('database.json is missing required keys: ' + missingKeys.join(', '));
+    }
+    
+    for (const key in staticData) {
+      DB_Cache[key] = staticData[key];
+      await DBStore.put(key, staticData[key]);
+    }
+    
+    if (serverOnline) {
+      await syncCacheToServer();
+    }
+    
+    alert('Database successfully synced with repository! Reloading...');
+    location.reload();
+  } catch (err) {
+    console.error("Repository sync failed:", err);
+    alert('Failed to sync with repository database.json: ' + err.message);
+  }
+}
+
 
 function wireEventListeners() {
   lucide.createIcons();
@@ -1871,7 +1925,7 @@ function wireEventListeners() {
       importDatabase(e.target.files[0]);
     }
   });
-
+   $('db-repo-sync-btn').addEventListener('click', syncWithRepository);
 
   $('cal-prev').addEventListener('click', () => {
     calMonth--;
