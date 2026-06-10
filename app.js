@@ -1863,6 +1863,15 @@ function wireEventListeners() {
 
   $('geo-save-btn').addEventListener('click', handleSaveGeofence);
   $('geo-use-my-loc').addEventListener('click', useMyLocationAsGeofence);
+    // Local database backup & recovery events
+  $('db-export-btn').addEventListener('click', exportDatabase);
+  $('db-import-trigger-btn').addEventListener('click', () => $('db-import-file').click());
+  $('db-import-file').addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      importDatabase(e.target.files[0]);
+    }
+  });
+
 
   $('cal-prev').addEventListener('click', () => {
     calMonth--;
