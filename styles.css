@@ -401,6 +401,7 @@ button, input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .geo-dot.active { background: var(--success); animation: geoPulse 1.5s ease infinite; }
+.geo-dot.local  { background: var(--accent); opacity: 0.85; }
 .geo-dot.error  { background: var(--danger); }
 
 @keyframes geoPulse {
