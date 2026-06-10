@@ -411,6 +411,21 @@
           <span id="geo-save-msg">Geofence settings saved.</span>
         </div>
       </div>
+            <!-- Database settings -->
+      <div class="geo-settings" style="margin-top: 24px;">
+        <h3><i data-lucide="database" style="width:18px;height:18px;color:var(--accent);"></i> Local Database Backup &amp; Recovery</h3>
+        <p>Export your employee records, attendance history, leave logs, and payroll settings to a JSON file or import a previous backup to restore your data.</p>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" id="db-export-btn">
+            <i data-lucide="download" style="width:15px;height:15px;"></i> Export Backup (JSON)
+          </button>
+          <button class="btn btn-secondary btn-sm" id="db-import-trigger-btn">
+            <i data-lucide="upload" style="width:15px;height:15px;"></i> Restore Backup (JSON)
+          </button>
+          <input type="file" id="db-import-file" accept=".json" style="display:none;">
+        </div>
+      </div>
+
 
       <!-- AI insights -->
       <div class="ai-box">
