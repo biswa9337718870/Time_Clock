@@ -1723,6 +1723,50 @@ async function bootApp() {
     console.error("Critical Boot Failure:", err);
   }
 }
+function exportDatabase() {
+  try {
+    const dataStr = JSON.stringify(DB_Cache, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const exportFileDefaultName = 'apexflow_backup_' + getLocalISODate() + '.json';
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    toast('Database exported successfully!', 'success');
+  } catch (err) {
+    console.error("Backup failed:", err);
+    toast('Database export failed', 'error');
+  }
+}
+function importDatabase(file) {
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const importedData = JSON.parse(e.target.result);
+      const requiredKeys = ['employees', 'attendance', 'leaves', 'geofence'];
+      const missingKeys = requiredKeys.filter(k => !(k in importedData));
+      if (missingKeys.length > 0) {
+        throw new Error('Missing keys: ' + missingKeys.join(', '));
+      }
+      if (!confirm('Are you sure you want to restore this database? This will overwrite all current local data and reload the application.')) {
+        return;
+      }
+      for (const key in importedData) {
+        DB_Cache[key] = importedData[key];
+        await DBStore.put(key, importedData[key]);
+      }
+      if (serverOnline) {
+        await syncCacheToServer();
+      }
+      alert('Database restored successfully! Reloading...');
+      location.reload();
+    } catch (err) {
+      console.error("Restore failed:", err);
+      alert('Failed to restore database: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
 
 function wireEventListeners() {
   lucide.createIcons();
