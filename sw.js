@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apexflow-v2';
+const CACHE_NAME = 'apexflow-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -32,14 +32,25 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      return cachedResponse || fetch(e.request).catch(() => {
-        // Fallback for API calls or non-cached pages
-        return new Response('Offline Content Unavailable', {
-          status: 503,
-          statusText: 'Service Unavailable'
+    fetch(e.request)
+      .then((networkResponse) => {
+        // Cache the successful network response for offline use
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(e.request).then((cachedResponse) => {
+          return cachedResponse || new Response('Offline Content Unavailable', {
+            status: 503,
+            statusText: 'Service Unavailable'
+          });
         });
-      });
-    })
+      })
   );
 });
+
