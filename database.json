@@ -72,8 +72,12 @@
       "leaveBalance": {
         "Annual": 21,
         "Sick": 10,
-        "Casual": 7
-      }
+        "Casual": 7,
+        "Holiday": 0
+      },
+      "timeCut": 0,
+      "timeDebt": 0,
+      "overtimeAccumulated": 0
     },
     {
       "id": "EMP001",
@@ -88,8 +92,12 @@
       "leaveBalance": {
         "Annual": 21,
         "Sick": 10,
-        "Casual": 7
-      }
+        "Casual": 7,
+        "Holiday": 0
+      },
+      "timeCut": 0,
+      "timeDebt": 0,
+      "overtimeAccumulated": 0
     },
     {
       "id": "EMP002",
@@ -104,8 +112,12 @@
       "leaveBalance": {
         "Annual": 21,
         "Sick": 10,
-        "Casual": 7
-      }
+        "Casual": 7,
+        "Holiday": 0
+      },
+      "timeCut": 0,
+      "timeDebt": 0,
+      "overtimeAccumulated": 0
     }
   ],
   "geofence": {
