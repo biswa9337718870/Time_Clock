@@ -439,6 +439,7 @@ button, input, select, textarea { font-family: inherit; outline: none; }
 =========================== */
 .main-content {
   flex: 1;
+  min-width: 0;
   margin-left: var(--sidebar);
   padding: 30px 36px;
   min-height: 100vh;
@@ -834,6 +835,16 @@ button, input, select, textarea { font-family: inherit; outline: none; }
 
 @media (max-width: 700px) { .three-col { grid-template-columns: 1fr; } }
 
+.four-col {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 900px) { .four-col { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .four-col { grid-template-columns: 1fr; } }
+
 /* ===========================
    TABLES
 =========================== */
@@ -983,7 +994,7 @@ tr:hover td { background: var(--bg3); }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 30px;
-  width: 100%;
+  width: calc(100% - 32px);
   max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
@@ -1284,8 +1295,23 @@ tr:hover td { background: var(--bg3); }
 }
 
 /* ===========================
-   RESPONSIVE MOBILE
+   RESPONSIVE MOBILE & BACKDROP
 =========================== */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 150;
+  transition: var(--transition);
+}
+
+.sidebar-overlay.open {
+  display: block;
+}
+
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
@@ -1302,16 +1328,43 @@ tr:hover td { background: var(--bg3); }
 
   .kpi-grid { grid-template-columns: 1fr 1fr; }
   .three-col { grid-template-columns: 1fr 1fr; }
+  .four-col { grid-template-columns: 1fr 1fr; }
   .form-row-2 { grid-template-columns: 1fr; }
   .geo-form { grid-template-columns: 1fr; }
+  .geo-form button { width: 100%; align-self: stretch !important; }
 
   .scanner-ring { width: 200px; height: 200px; }
   .scanner-video, .scanner-canvas, .scanner-fallback { width: 200px; height: 200px; }
+  
+
+
+  .page-header {
+    margin-bottom: 20px;
+    gap: 10px;
+  }
+  .page-title { font-size: 20px; }
+  .header-right {
+    gap: 8px;
+  }
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+  .icon-btn i {
+    width: 16px;
+    height: 16px;
+  }
+  .date-label { display: none; }
 }
 
 @media (max-width: 480px) {
   .kpi-grid { grid-template-columns: 1fr; }
   .three-col { grid-template-columns: 1fr; }
+  .four-col { grid-template-columns: 1fr; }
+  .page-title { font-size: 18px; }
+  .login-card { padding: 28px 20px; }
+  .modal-box { padding: 20px 16px; max-width: 95vw; width: calc(100% - 24px); }
 }
 
 /* Custom styling for break indicator */
@@ -1324,3 +1377,286 @@ tr:hover td { background: var(--bg3); }
   100% { color: var(--danger); text-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
 }
 
+/* ===========================
+   STICKY BOTTOM NAVIGATION (MOBILE ONLY)
+=========================== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.05);
+  display: none;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 100;
+  padding: 0 10px;
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text2);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  gap: 4px;
+  flex: 1;
+  height: 100%;
+}
+
+.bottom-nav-item i {
+  transition: transform 0.2s;
+  color: var(--text2);
+}
+
+.bottom-nav-item:hover i {
+  transform: translateY(-1px);
+}
+
+.bottom-nav-item.active {
+  color: var(--accent);
+}
+
+.bottom-nav-item.active i {
+  color: var(--accent);
+}
+
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+  }
+  
+  .main-content {
+    padding-bottom: 84px; /* Avoid bottom-nav overlap */
+  }
+}
+
+/* ===========================
+   UI/UX REFINEMENTS
+=========================== */
+.form-field input[readonly] {
+  background: var(--bg3) !important;
+  color: var(--text2) !important;
+  cursor: not-allowed;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+
+.btn-waive {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-waive:hover {
+  background: rgba(16, 185, 129, 0.22);
+  transform: translateY(-1px);
+}
+
+.form-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.form-checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.form-checkbox-row label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  margin: 0 !important;
+}
+
+.scanner-btn-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+.scanner-main-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
+.scanner-btn-container .btn {
+  width: 100%;
+}
+
+@media (max-width: 480px) {
+  .scanner-main-btns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===================================================
+   MOBILE RESPONSIVENESS & TOUCH TARGET OPTIMIZATIONS
+   =================================================== */
+
+/* Action cell layout */
+.action-cell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Fluid Typography and title scaling */
+.page-title {
+  font-size: clamp(1.2rem, 4vw, 1.5rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-header div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Optimized Close Button touch targets */
+.modal-close, .drawer-close {
+  padding: 8px;
+  margin: -8px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Touch-friendly inputs and buttons */
+input, select, textarea {
+  min-height: 44px;
+}
+
+.btn {
+  min-height: 44px;
+}
+
+.btn-sm, .btn-icon {
+  min-height: 36px;
+}
+
+.bottom-nav-item {
+  min-width: 48px;
+}
+
+/* Table Stack responsive layout */
+@media (max-width: 768px) {
+  .menu-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .table-wrap {
+    border: none;
+    background: transparent;
+    overflow-x: visible;
+  }
+
+  .table-wrap table,
+  .table-wrap thead,
+  .table-wrap tbody,
+  .table-wrap th,
+  .table-wrap td,
+  .table-wrap tr {
+    display: block;
+    width: 100%;
+  }
+
+  .table-wrap thead {
+    display: none; /* Hide desktop headers */
+  }
+
+  .table-wrap tr {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+
+  .table-wrap tr:hover td {
+    background: transparent;
+  }
+
+  .table-wrap td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--bg3);
+    text-align: right;
+    font-size: 13.5px;
+    min-height: 44px;
+  }
+
+  .table-wrap td:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .table-wrap td:first-child {
+    padding-top: 0;
+  }
+
+  /* Inject headers using data-label attribute */
+  .table-wrap td[data-label]::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: var(--text2);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 16px;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .table-wrap .action-cell {
+    justify-content: flex-end;
+  }
+}
+
+/* Payslip grid scaling on small devices */
+@media (max-width: 500px) {
+  .payslip-meta {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
