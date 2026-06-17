@@ -83,6 +83,9 @@
 <!-- ===================== APP WORKSPACE ===================== -->
 <div id="app" class="app-layout hidden">
 
+  <!-- Sidebar mobile backdrop overlay -->
+  <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
@@ -128,6 +131,7 @@
     <header class="page-header">
       <div style="display:flex;align-items:center;gap:14px;">
         <button class="menu-btn" id="menu-btn"><i data-lucide="menu" style="width:22px;height:22px;"></i></button>
+        <button class="btn-icon hidden" id="hdr-back-btn" title="Back to Dashboard" style="border:none;background:var(--bg3);flex-shrink:0;"><i data-lucide="arrow-left" style="width:16px;height:16px;"></i></button>
         <h2 class="page-title" id="page-title">Dashboard</h2>
       </div>
       <div class="header-right">
@@ -197,6 +201,14 @@
           <div class="kpi-value" id="e-kpi-leave">0 Days</div>
           <div class="kpi-sub">Paid leave available</div>
         </div>
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-label">Carry-over Time</span>
+            <div class="kpi-icon" style="background:var(--purple-bg);"><i data-lucide="arrow-left-right" style="width:20px;height:20px;color:var(--purple);"></i></div>
+          </div>
+          <div class="kpi-value" id="e-kpi-carryover">0.00 hrs</div>
+          <div class="kpi-sub" id="e-kpi-carryover-sub">No cut/debt pending</div>
+        </div>
       </div>
 
       <!-- Face Scanner + Timer -->
@@ -227,12 +239,17 @@
 
             <div class="scanner-status" id="scan-status">Ready to scan</div>
 
-            <div class="scan-btn-row">
-              <button class="btn btn-primary btn-sm" id="btn-checkin">
-                <i data-lucide="log-in" style="width:15px;height:15px;"></i> Clock In
-              </button>
-              <button class="btn btn-danger btn-sm" id="btn-checkout" disabled>
-                <i data-lucide="log-out" style="width:15px;height:15px;"></i> Clock Out
+            <div class="scanner-btn-container">
+              <div class="scanner-main-btns">
+                <button class="btn btn-primary btn-sm" id="btn-checkin">
+                  <i data-lucide="log-in" style="width:15px;height:15px;"></i> Clock In
+                </button>
+                <button class="btn btn-danger btn-sm" id="btn-checkout" disabled>
+                  <i data-lucide="log-out" style="width:15px;height:15px;"></i> Clock Out
+                </button>
+              </div>
+              <button class="btn btn-secondary btn-sm hidden" id="btn-break">
+                <i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">Start Break</span>
               </button>
             </div>
           </div>
@@ -253,6 +270,9 @@
             <div class="timer-details">
               <div class="timer-row"><span>Clock-In Time</span><span id="td-checkin">—</span></div>
               <div class="timer-row"><span>Break (Auto)</span><span>1 Hour</span></div>
+              <div class="timer-row" id="row-carryover-cut" style="display:none; color:var(--success);"><span>Carry-over Time Cut</span><span id="td-carryover-cut">0.00 hrs</span></div>
+              <div class="timer-row" id="row-carryover-debt" style="display:none; color:var(--warn);"><span>Carry-over Time Debt</span><span id="td-carryover-debt">0.00 hrs</span></div>
+              <div class="timer-row"><span>Required Hours Today</span><span id="td-req-hours">8.00 hrs</span></div>
               <div class="timer-row"><span>Expected Clock-Out</span><span id="td-checkout">—</span></div>
               <div class="timer-row"><span>Net Work Hours</span><span id="td-net">0.00 hrs</span></div>
             </div>
@@ -299,10 +319,11 @@
 
     <!-- EMPLOYEE LEAVES & PAYSLIPS -->
     <div id="v-emp-leaves" class="view-panel">
-      <div class="three-col">
+      <div class="four-col">
         <div class="leave-card"><div class="leave-num" id="bal-annual">0</div><div class="leave-type">Annual Leave</div></div>
         <div class="leave-card"><div class="leave-num" id="bal-sick">0</div><div class="leave-type">Sick Leave</div></div>
         <div class="leave-card"><div class="leave-num" id="bal-casual">0</div><div class="leave-type">Casual Leave</div></div>
+        <div class="leave-card"><div class="leave-num" id="bal-holiday">0</div><div class="leave-type">Overtime Holiday</div></div>
       </div>
 
       <div class="two-col">
@@ -311,11 +332,24 @@
           <form id="leave-form" class="modal-form" style="margin-top:0;">
             <div class="form-field">
               <label for="lv-type">Leave Type</label>
-              <select id="lv-type"><option value="Annual">Annual</option><option value="Sick">Sick</option><option value="Casual">Casual</option></select>
+              <select id="lv-type">
+                <option value="Annual">Annual</option>
+                <option value="Sick">Sick</option>
+                <option value="Casual">Casual</option>
+                <option value="Holiday">Overtime Holiday</option>
+                <option value="Half-Day Annual">Half-Day Annual</option>
+                <option value="Half-Day Sick">Half-Day Sick</option>
+                <option value="Half-Day Casual">Half-Day Casual</option>
+                <option value="Half-Day Holiday">Half-Day Overtime Holiday</option>
+              </select>
             </div>
             <div class="form-row-2">
               <div class="form-field"><label for="lv-start">From</label><input type="date" id="lv-start" required></div>
               <div class="form-field"><label for="lv-end">To</label><input type="date" id="lv-end" required></div>
+            </div>
+            <div class="form-checkbox-row">
+              <input type="checkbox" id="lv-halfday">
+              <label for="lv-halfday">Apply as Half-Day Leave</label>
             </div>
             <div class="form-field">
               <label for="lv-reason">Reason</label>
@@ -486,7 +520,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Dept.</th><th>Role</th><th>Salary</th><th>Actions</th></tr></thead>
+            <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Dept.</th><th>Role</th><th>Salary</th><th>Time Debt</th><th>Actions</th></tr></thead>
             <tbody id="emp-dir-tbody"></tbody>
           </table>
         </div>
@@ -512,7 +546,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Date</th><th>Emp ID</th><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Work Hrs</th><th>OT</th><th>Status</th></tr></thead>
+            <thead><tr><th>Date</th><th>Emp ID</th><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Work Hrs</th><th>OT</th><th>Status</th><th>Action</th></tr></thead>
             <tbody id="att-log-tbody"></tbody>
           </table>
         </div>
@@ -522,7 +556,28 @@
     <!-- ADMIN LEAVES -->
     <div id="v-admin-leaves" class="view-panel">
       <div class="panel">
-        <div class="panel-header"><span class="panel-title">Leave Approvals Centre</span></div>
+        <div class="panel-header">
+          <span class="panel-title">Leave Approvals Centre</span>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <select id="leave-status-filter" style="padding:7px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);">
+              <option value="ALL">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+            <select id="leave-type-filter" style="padding:7px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);">
+              <option value="ALL">All Leave Types</option>
+              <option value="Annual">Annual</option>
+              <option value="Sick">Sick</option>
+              <option value="Casual">Casual</option>
+              <option value="Holiday">Overtime Holiday</option>
+              <option value="Half-Day Annual">Half-Day Annual</option>
+              <option value="Half-Day Sick">Half-Day Sick</option>
+              <option value="Half-Day Casual">Half-Day Casual</option>
+              <option value="Half-Day Holiday">Half-Day Overtime Holiday</option>
+            </select>
+          </div>
+        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Employee</th><th>Type</th><th>From → To</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead>
@@ -608,6 +663,9 @@
     </div>
 
   </main>
+
+  <!-- Sticky Bottom Navigation Bar (Mobile only) -->
+  <nav class="bottom-nav" id="bottom-nav"></nav>
 </div>
 
 <!-- ===================================================
@@ -710,6 +768,10 @@
         <div class="form-field"><label for="ef-salary">Monthly Base Salary ($)</label><input type="number" id="ef-salary" min="0" placeholder="5000" required></div>
         <div class="form-field"><label for="ef-ot">Overtime Rate ($/hr)</label><input type="number" id="ef-ot" min="0" placeholder="25" required></div>
       </div>
+      <div class="form-row-2">
+        <div class="form-field"><label for="ef-timedebt">Carry-over Time Debt (Hrs)</label><input type="number" step="0.01" id="ef-timedebt" min="0" placeholder="0.00"></div>
+        <div class="form-field"><label for="ef-timecut">Carry-over Time Cut (Hrs)</label><input type="number" step="0.01" id="ef-timecut" min="0" placeholder="0.00"></div>
+      </div>
       <button type="submit" class="btn btn-primary">Save Employee Profile</button>
     </form>
   </div>
@@ -726,6 +788,37 @@
       <div class="form-field"><label for="hf-date">Date</label><input type="date" id="hf-date" required></div>
       <div class="form-field"><label for="hf-name">Holiday Name</label><input type="text" id="hf-name" placeholder="e.g. Independence Day" required></div>
       <button type="submit" class="btn btn-primary">Add to Calendar</button>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Attendance Modal (Admin Only) -->
+<div class="modal-overlay" id="modal-edit-attendance">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3>Edit Attendance Log</h3>
+      <button class="modal-close" id="edit-att-close">×</button>
+    </div>
+    <form id="edit-att-form" class="modal-form">
+      <input type="hidden" id="ea-idx">
+      <div class="form-row-2">
+        <div class="form-field"><label>Employee</label><input type="text" id="ea-name" readonly style="background:var(--bg3);"></div>
+        <div class="form-field"><label>Date</label><input type="text" id="ea-date" readonly style="background:var(--bg3);"></div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-field"><label for="ea-checkin">Clock In Time</label><input type="time" id="ea-checkin" required></div>
+        <div class="form-field"><label for="ea-checkout">Clock Out Time</label><input type="time" id="ea-checkout"></div>
+      </div>
+      <div class="form-field">
+        <label for="ea-status">Status</label>
+        <select id="ea-status">
+          <option value="Present">Present</option>
+          <option value="Late">Late</option>
+          <option value="Absent">Absent</option>
+          <option value="Exceeded Break">Exceeded Break</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Save Attendance Changes</button>
     </form>
   </div>
 </div>
@@ -751,7 +844,10 @@
   <div class="drawer-box">
     <div class="drawer-header">
       <h3>Email Simulator</h3>
-      <button class="modal-close" id="email-drawer-close">×</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-secondary btn-sm" id="email-clear-btn" style="padding:4px 8px;font-size:12px;min-height:30px;">Clear All</button>
+        <button class="modal-close" id="email-drawer-close">×</button>
+      </div>
     </div>
     <p class="drawer-desc">Simulated outbound email notifications triggered by attendance events, payroll runs, and leave updates.</p>
     <div class="drawer-list" id="email-list"></div>
@@ -763,7 +859,10 @@
   <div class="drawer-box">
     <div class="drawer-header">
       <h3>Notifications</h3>
-      <button class="modal-close" id="notif-drawer-close">×</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-secondary btn-sm" id="notif-clear-btn" style="padding:4px 8px;font-size:12px;min-height:30px;">Clear All</button>
+        <button class="modal-close" id="notif-drawer-close">×</button>
+      </div>
     </div>
     <p class="drawer-desc">In-app alerts from attendance, leave approvals, and payroll events.</p>
     <div class="drawer-list" id="notif-list"></div>
