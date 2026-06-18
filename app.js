@@ -302,6 +302,7 @@ async function initDB() {
   DB.set('notifications', []);
   DB.set('emails', []);
   DB.set('geofence', { lat: null, lng: null, radius: 200 });
+  DB.set('tasks', []);
   DB.set('booted', true);
 }
 
@@ -768,12 +769,14 @@ const adminNav = [
   { view: 'v-admin-leaves',   icon: 'mail-open',        label: 'Leave Requests' },
   { view: 'v-admin-holidays', icon: 'calendar',         label: 'Holidays' },
   { view: 'v-admin-payroll',  icon: 'banknote',         label: 'Payroll' },
+  { view: 'v-admin-tasks',    icon: 'list-todo',        label: 'Assign Tasks' },
 ];
 
 const empNav = [
   { view: 'v-emp-dash',   icon: 'layout-dashboard', label: 'Dashboard' },
   { view: 'v-emp-logs',   icon: 'calendar-clock',   label: 'My Attendance' },
   { view: 'v-emp-leaves', icon: 'mail-open',         label: 'Leaves & Payslips' },
+  { view: 'v-emp-tasks',  icon: 'list-todo',        label: 'Daily Tasks' },
 ];
 
 function buildSidebar() {
@@ -798,9 +801,11 @@ function buildSidebar() {
         case 'v-admin-leaves':   renderLeaveApprovals(); break;
         case 'v-admin-holidays': renderCalendar(); renderHolidays(); break;
         case 'v-admin-payroll':  renderPayroll(); break;
+        case 'v-admin-tasks':    renderAdminTasks(); break;
         case 'v-emp-dash':       loadEmpDash(); break;
         case 'v-emp-logs':       renderEmpLogs(); break;
         case 'v-emp-leaves':     renderEmpLeaves(); break;
+        case 'v-emp-tasks':      renderEmpTasks(); break;
       }
       lucide.createIcons();
       if (window.innerWidth < 768) {
@@ -2152,6 +2157,162 @@ function renderNotifs() {
 }
 
 // ─────────────────────────────────────────────
+// DAILY TASKS SYSTEM
+// ─────────────────────────────────────────────
+function renderAdminTasks() {
+  if (!$('admin-task-date-filter').value) {
+    $('admin-task-date-filter').value = getLocalISODate();
+  }
+  if (!$('task-date-input').value) {
+    $('task-date-input').value = getLocalISODate();
+  }
+
+  const emps = DB.get('employees') || [];
+  const select = $('task-emp-select');
+  if (select) {
+    const prevVal = select.value;
+    select.innerHTML = emps.filter(e => e.role !== 'Admin').map(e => `<option value="${e.id}">${e.name} (${e.id})</option>`).join('');
+    if (prevVal) select.value = prevVal;
+  }
+
+  const tasks = DB.get('tasks') || [];
+  const dateFilter = $('admin-task-date-filter').value;
+  const filteredTasks = tasks.filter(t => t.date === dateFilter);
+
+  $('admin-task-tbody').innerHTML = filteredTasks.map(t => {
+    const priorityBadge = t.priority === 'High' ? 'badge-red' : t.priority === 'Medium' ? 'badge-yellow' : 'badge-blue';
+    const statusBadge = t.status === 'Completed' ? 'badge-green' : t.status === 'In Progress' ? 'badge-purple' : 'badge-yellow';
+    return `
+      <tr>
+        <td data-label="Employee" style="font-weight:600;">${t.empName}</td>
+        <td data-label="Date">${t.date}</td>
+        <td data-label="Task Description" style="text-align:left; max-width:200px; white-space:pre-wrap;">${t.description}</td>
+        <td data-label="Priority"><span class="badge ${priorityBadge}">${t.priority}</span></td>
+        <td data-label="Status"><span class="badge ${statusBadge}">${t.status}</span></td>
+        <td data-label="Notes"><div class="task-notes-text">${t.notes || '—'}</div></td>
+        <td data-label="Action">
+          <button class="btn-icon" onclick="handleTaskDelete('${t.id}')" title="Delete Task" style="color:var(--danger);">
+            <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text2);">No tasks assigned for this date.</td></tr>';
+  lucide.createIcons();
+}
+
+function handleTaskAssign(e) {
+  e.preventDefault();
+  const empId = $('task-emp-select').value;
+  const emps = DB.get('employees') || [];
+  const emp = emps.find(e => e.id === empId);
+  if (!emp) return;
+
+  const date = $('task-date-input').value;
+  const priority = $('task-priority-select').value;
+  const description = $('task-desc-input').value.trim();
+
+  const taskId = 'TSK' + Date.now();
+  const newTask = {
+    id: taskId,
+    empId: emp.id,
+    empName: emp.name,
+    assignedBy: currentUser.name,
+    date: date,
+    description: description,
+    priority: priority,
+    status: 'Pending',
+    notes: '',
+    updatedAt: new Date().toISOString()
+  };
+
+  DB.push('tasks', newTask);
+  addNotif(`New task assigned to ${emp.name}: ${description.slice(0, 30)}...`, '📋');
+  addEmail(emp.email, 'New Task Assigned', `Hi ${emp.name},\n\nHR Admin has assigned a new daily task to you for ${date}.\nDescription: ${description}\nPriority: ${priority}\n\n— Time Clock HR`);
+  
+  toast('Task assigned successfully!', 'success');
+  $('task-desc-input').value = '';
+  renderAdminTasks();
+}
+
+function handleTaskDelete(taskId) {
+  if (!confirm("Are you sure you want to remove/cancel this task?")) return;
+  let tasks = DB.get('tasks') || [];
+  tasks = tasks.filter(t => t.id !== taskId);
+  DB.set('tasks', tasks);
+  toast('Task deleted successfully.', 'error');
+  renderAdminTasks();
+}
+
+function renderEmpTasks() {
+  if (!$('emp-task-date-filter').value) {
+    $('emp-task-date-filter').value = getLocalISODate();
+  }
+
+  const tasks = DB.get('tasks') || [];
+  const dateFilter = $('emp-task-date-filter').value;
+  const statusFilter = $('emp-task-status-filter').value;
+
+  let filtered = tasks.filter(t => t.empId === currentUser.id);
+  if (dateFilter) filtered = filtered.filter(t => t.date === dateFilter);
+  if (statusFilter !== 'ALL') filtered = filtered.filter(t => t.status === statusFilter);
+
+  $('emp-task-tbody').innerHTML = filtered.map(t => {
+    const priorityBadge = t.priority === 'High' ? 'badge-red' : t.priority === 'Medium' ? 'badge-yellow' : 'badge-blue';
+    const statusBadge = t.status === 'Completed' ? 'badge-green' : t.status === 'In Progress' ? 'badge-purple' : 'badge-yellow';
+    return `
+      <tr>
+        <td data-label="Date">${t.date}</td>
+        <td data-label="Assigned By">${t.assignedBy || 'HR'}</td>
+        <td data-label="Task Description" style="text-align:left; max-width:200px; white-space:pre-wrap;">${t.description}</td>
+        <td data-label="Priority"><span class="badge ${priorityBadge}">${t.priority}</span></td>
+        <td data-label="Status"><span class="badge ${statusBadge}">${t.status}</span></td>
+        <td data-label="Notes"><div class="task-notes-text">${t.notes || '—'}</div></td>
+        <td data-label="Action">
+          <button class="btn btn-secondary btn-sm" onclick="openTaskUpdate('${t.id}')">
+            <i data-lucide="edit-3" style="width:13px;height:13px;margin-right:4px;"></i>Update
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text2);">No daily tasks found for these criteria.</td></tr>';
+  lucide.createIcons();
+}
+
+function openTaskUpdate(taskId) {
+  const tasks = DB.get('tasks') || [];
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  $('tu-id').value = task.id;
+  $('tu-desc').textContent = task.description;
+  $('tu-status').value = task.status || 'Pending';
+  $('tu-notes').value = task.notes || '';
+  openModal('modal-task-update');
+}
+
+function handleTaskUpdate(e) {
+  e.preventDefault();
+  const taskId = $('tu-id').value;
+  const status = $('tu-status').value;
+  const notes = $('tu-notes').value.trim();
+
+  const tasks = DB.get('tasks') || [];
+  const idx = tasks.findIndex(t => t.id === taskId);
+  if (idx >= 0) {
+    tasks[idx].status = status;
+    tasks[idx].notes = notes;
+    tasks[idx].updatedAt = new Date().toISOString();
+
+    DB.set('tasks', tasks);
+    addNotif(`Task status updated by ${currentUser.name}: ${status}`, '✅');
+    toast('Task updated successfully!', 'success');
+    closeModal('modal-task-update');
+    renderEmpTasks();
+  }
+}
+
+// ─────────────────────────────────────────────
 // GEOFENCE SETTINGS
 // ─────────────────────────────────────────────
 function handleSaveGeofence() {
@@ -2491,12 +2652,25 @@ function wireEventListeners() {
     }
   });
 
-  ['modal-emp','modal-holiday','modal-payslip','modal-faceid','modal-outside-req','modal-edit-attendance'].forEach(id => {
+  ['modal-emp','modal-holiday','modal-payslip','modal-faceid','modal-outside-req','modal-edit-attendance', 'modal-task-update'].forEach(id => {
     $(id).addEventListener('click', e => { if (e.target === $(id)) closeModal(id); });
   });
 
   $('edit-att-close').addEventListener('click', () => closeModal('modal-edit-attendance'));
   $('edit-att-form').addEventListener('submit', handleSaveAttendance);
+
+  // Daily Tasks Event Listenings
+  $('task-assign-form').addEventListener('submit', handleTaskAssign);
+  $('task-update-form').addEventListener('submit', handleTaskUpdate);
+  $('task-update-close').addEventListener('click', () => closeModal('modal-task-update'));
+  $('admin-task-date-filter').addEventListener('change', renderAdminTasks);
+  $('emp-task-date-filter').addEventListener('change', renderEmpTasks);
+  $('emp-task-status-filter').addEventListener('change', renderEmpTasks);
+
+  const todayStr = getLocalISODate();
+  $('admin-task-date-filter').value = todayStr;
+  $('task-date-input').value = todayStr;
+  $('emp-task-date-filter').value = todayStr;
 
   ['email-drawer','notif-drawer'].forEach(id => {
     $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).classList.remove('open'); });
