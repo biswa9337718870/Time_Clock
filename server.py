@@ -46,7 +46,7 @@ except Exception as conn_err:
     # We will let the server continue, but operations will raise errors
 
 # Collections helper lists
-LIST_COLLECTIONS = ['employees', 'attendance', 'leaves', 'holidays', 'payrolls', 'notifications', 'emails', 'outside_work']
+LIST_COLLECTIONS = ['employees', 'attendance', 'leaves', 'holidays', 'payrolls', 'notifications', 'emails', 'outside_work', 'tasks']
 
 # Seed MongoDB if empty and database.json exists
 def seed_database():
@@ -148,7 +148,7 @@ class ApexFlowHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({"status": "success"}).encode('utf-8')) 
+                self.wfile.write(json.dumps({"status": "success"}).encode('utf-8'))
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-type', 'application/json')

@@ -1660,3 +1660,23 @@ input, select, textarea {
     gap: 12px;
   }
 }
+
+/* ===========================
+   DAILY TASKS UI EXTENSION
+   =========================== */
+.task-notes-text {
+  font-size: 13px;
+  color: var(--text2);
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.task-notes-text:hover {
+  white-space: normal;
+  overflow: visible;
+  color: var(--text);
+}
+
