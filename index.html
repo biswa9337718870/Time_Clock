@@ -42,7 +42,10 @@
         <label for="l-pass">Password</label>
         <div class="input-icon">
           <i data-lucide="lock" style="width:18px;height:18px;"></i>
-          <input type="password" id="l-pass" placeholder="••••••••" required>
+          <input type="password" id="l-pass" class="input-with-toggle" placeholder="••••••••" required>
+          <button type="button" id="toggle-password" class="password-toggle-btn" title="Toggle Password Visibility">
+            <i data-lucide="eye" style="width:18px;height:18px;"></i>
+          </button>
         </div>
       </div>
       <button type="submit" class="btn btn-primary" style="margin-top:6px;">

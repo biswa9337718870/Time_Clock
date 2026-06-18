@@ -1680,3 +1680,30 @@ input, select, textarea {
   color: var(--text);
 }
 
+/* Password Visibility Toggle */
+.password-toggle-btn {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  z-index: 5;
+}
+.password-toggle-btn:hover {
+  color: var(--text);
+}
+.password-toggle-btn i {
+  position: static !important;
+  pointer-events: auto !important;
+  color: inherit !important;
+}
+.input-with-toggle {
+  padding-right: 44px !important;
+}
+

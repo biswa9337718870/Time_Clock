@@ -81,7 +81,6 @@ const DBStore = {
 // ─────────────────────────────────────────────
 const DB_Cache = {};
 let serverOnline = false;
-const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 const DB = {
   get(key) {
@@ -91,8 +90,8 @@ const DB = {
     DB_Cache[key] = val;
     // Persist to local IndexedDB
     DBStore.put(key, val).catch(err => console.error("IndexedDB write fail:", err));
-    // Sync to backend server if connected and running locally
-    if (isLocalhost && serverOnline) {
+    // Sync to backend server if online
+    if (serverOnline) {
       syncCacheToServer();
     }
   },
@@ -105,7 +104,6 @@ const DB = {
 };
 
 async function syncCacheToServer() {
-  if (!isLocalhost) return;
   try {
     const res = await fetch('/api/save', {
       method: 'POST',
@@ -2370,37 +2368,33 @@ async function bootApp() {
     // Seed empty database with default values
     await initDB();
 
-    // Try to sync with backend Python server database only if running locally
-    if (isLocalhost) {
-      try {
-        const res = await fetch('/api/data');
-        if (res.ok) {
-          const serverData = await res.json();
-          if (serverData && Object.keys(serverData).length > 0) {
-            // Server database has records -> sync down to local cache and local IndexedDB
-            for (const key in serverData) {
-              DB_Cache[key] = serverData[key];
-              await DBStore.put(key, serverData[key]);
-            }
-            console.log("Database successfully synced from server.");
-          } else {
-            // Server database is empty -> push local seed cache to server database
-            await fetch('/api/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(DB_Cache)
-            });
-            console.log("Database successfully seeded to server.");
+    // Try to sync with backend Python server database
+    try {
+      const res = await fetch('/api/data');
+      if (res.ok) {
+        const serverData = await res.json();
+        if (serverData && Object.keys(serverData).length > 0) {
+          // Server database has records -> sync down to local cache and local IndexedDB
+          for (const key in serverData) {
+            DB_Cache[key] = serverData[key];
+            await DBStore.put(key, serverData[key]);
           }
-          setServerStatus(true);
+          console.log("Database successfully synced from server.");
         } else {
-          setServerStatus(false);
+          // Server database is empty -> push local seed cache to server database
+          await fetch('/api/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(DB_Cache)
+          });
+          console.log("Database successfully seeded to server.");
         }
-      } catch (serverErr) {
-        console.warn("Database server unreachable. Running in local mode.");
+        setServerStatus(true);
+      } else {
         setServerStatus(false);
       }
-    } else {
+    } catch (serverErr) {
+      console.warn("Database server unreachable. Running in local mode.");
       setServerStatus(false);
     }
 
@@ -2427,6 +2421,24 @@ function wireEventListeners() {
   setInterval(() => updateHeader(), 60000);
 
   $('login-form').addEventListener('submit', handleLogin);
+
+  const toggleBtn = $('toggle-password');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const passInput = $('l-pass');
+      const icon = toggleBtn.querySelector('i');
+      if (passInput && icon) {
+        if (passInput.type === 'password') {
+          passInput.type = 'text';
+          icon.setAttribute('data-lucide', 'eye-off');
+        } else {
+          passInput.type = 'password';
+          icon.setAttribute('data-lucide', 'eye');
+        }
+        lucide.createIcons();
+      }
+    });
+  }
 
   $('quick-admin').addEventListener('click', () => {
     $('l-email').value = 'admin@company.com';
