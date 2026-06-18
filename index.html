@@ -414,6 +414,32 @@
       </div>
     </div>
 
+    <!-- EMPLOYEE DAILY TASKS -->
+    <div id="v-emp-tasks" class="view-panel">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">My Daily Tasks</span>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <input type="date" id="emp-task-date-filter" class="geo-form-group input" style="padding:7px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);">
+            <select id="emp-task-status-filter" style="padding:7px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);">
+              <option value="ALL">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Date</th><th>Assigned By</th><th>Task Description</th><th>Priority</th><th>Status</th><th>Notes</th><th>Action</th>
+            </tr></thead>
+            <tbody id="emp-task-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- ADMIN DASHBOARD -->
     <div id="v-admin-dash" class="view-panel">
       <!-- Geofence settings -->
@@ -662,6 +688,59 @@
       </div>
     </div>
 
+    <!-- ADMIN DAILY TASKS -->
+    <div id="v-admin-tasks" class="view-panel">
+      <div class="two-col" style="align-items:stretch;">
+        <!-- TASK ASSIGNMENT FORM -->
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Assign New Daily Task</span></div>
+          <form id="task-assign-form" class="modal-form" style="margin-top:0;">
+            <div class="form-field">
+              <label for="task-emp-select">Select Employee</label>
+              <select id="task-emp-select" required></select>
+            </div>
+            <div class="form-row-2">
+              <div class="form-field">
+                <label for="task-date-input">Task Date</label>
+                <input type="date" id="task-date-input" required>
+              </div>
+              <div class="form-field">
+                <label for="task-priority-select">Priority</label>
+                <select id="task-priority-select">
+                  <option value="Low">Low</option>
+                  <option value="Medium" selected>Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="task-desc-input">Task Description</label>
+              <textarea id="task-desc-input" rows="4" placeholder="Specify details of the task to be performed..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Assign Task</button>
+          </form>
+        </div>
+
+        <!-- TASK OVERVIEW / MONITORING -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Tasks Overview</span>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <input type="date" id="admin-task-date-filter" style="padding:7px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Employee</th><th>Date</th><th>Task Description</th><th>Priority</th><th>Status</th><th>Notes</th><th>Action</th>
+              </tr></thead>
+              <tbody id="admin-task-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- Sticky Bottom Navigation Bar (Mobile only) -->
@@ -819,6 +898,36 @@
         </select>
       </div>
       <button type="submit" class="btn btn-primary">Save Attendance Changes</button>
+    </form>
+  </div>
+</div>
+
+<!-- Task Update Modal (Employee) -->
+<div class="modal-overlay" id="modal-task-update">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3>Update Task Status</h3>
+      <button class="modal-close" id="task-update-close">×</button>
+    </div>
+    <form id="task-update-form" class="modal-form">
+      <input type="hidden" id="tu-id">
+      <div class="form-field">
+        <label>Task Description</label>
+        <p id="tu-desc" style="font-size:14.5px; line-height: 1.5; color:var(--text2); padding:12px; background:var(--bg3); border-radius:10px; border:1px solid var(--border); margin-bottom:12px; font-weight:500; white-space:pre-wrap;"></p>
+      </div>
+      <div class="form-field">
+        <label for="tu-status">Status</label>
+        <select id="tu-status">
+          <option value="Pending">Pending</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Completed">Completed</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="tu-notes">Completion Notes / Feedback</label>
+        <textarea id="tu-notes" rows="3" placeholder="Provide details on completion or progress..." style="padding:10px; background:var(--bg2); border:1.5px solid var(--border); border-radius:var(--radius-sm); color:var(--text); width:100%;"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:6px;">Save Task Changes</button>
     </form>
   </div>
 </div>
