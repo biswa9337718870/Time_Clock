@@ -1698,7 +1698,8 @@ input, select, textarea {
 .password-toggle-btn:hover {
   color: var(--text);
 }
-.password-toggle-btn i {
+.password-toggle-btn i,
+.password-toggle-btn svg {
   position: static !important;
   pointer-events: auto !important;
   color: inherit !important;

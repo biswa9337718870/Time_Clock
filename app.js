@@ -221,7 +221,7 @@ function checkGeofence() {
 // STATE VARIABLES
 // ─────────────────────────────────────────────
 let currentUser = null;
-let timerInterval = null;
+let shiftInterval = null;
 let checkInTimestamp = null;
 let darkMode = false;
 let cameraStream = null;
@@ -234,7 +234,6 @@ let breakType = null; // 'auto' | 'manual' | null
 let breakSecondsRemaining = 3600; // 1 hour break limit
 let cumulativeBreakSeconds = 0;
 let breakStartTimestamp = null;
-let breakTimerInterval = null;
 let lastActiveTime = null;
 
 // ─────────────────────────────────────────────
@@ -395,12 +394,32 @@ function startContinuousLocationTracking() {
 
       updateGeoIndicator({ ok: isInside, dist: Math.round(dist), msg: isInside ? "Within Allowed Range" : "Outside Office Zone" });
 
-      if (!isInside && checkInTimestamp && !onBreak) {
-        // Automatically put on Break
-        triggerAutoBreak(true);
-      } else if (isInside && onBreak && breakType === 'auto') {
-        // Automatically resume shift
-        triggerAutoBreak(false);
+      const logs = (DB.get('attendance') || []).filter(l => l.empId === currentUser.id && l.date === today);
+      const isClockedIn = !!checkInTimestamp || (logs[0] && logs[0].checkIn && !logs[0].checkOut);
+
+      if (isInside) {
+        $('geo-block').classList.remove('open');
+      } else if (!isClockedIn) {
+        $('geo-block').classList.add('open');
+      }
+
+      if (isClockedIn) {
+        if (!isInside && !onBreak) {
+          // Automatically put on Break
+          triggerAutoBreak(true);
+        } else if (isInside && onBreak && breakType === 'auto') {
+          // Automatically resume shift
+          triggerAutoBreak(false);
+        }
+      } else {
+        // Logged in but not clocked in: if they walk into the office location, auto-trigger check-in Face ID scan
+        if (isInside) {
+          const scanStatusEl = $('scan-status');
+          if (scanStatusEl && !scanStatusEl.textContent.includes('Scanning') && !cameraStream) {
+            setScanStatus('Entered office zone. Starting check-in scan…', 'var(--success)');
+            setTimeout(() => startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin), 400);
+          }
+        }
       }
     },
     (err) => console.warn("Watch position error:", err),
@@ -415,28 +434,97 @@ function stopLocationTracking() {
   }
 }
 
+function startShiftInterval() {
+  if (shiftInterval) clearInterval(shiftInterval);
+  shiftInterval = setInterval(tickShift, 1000);
+  tickShift();
+}
+
+function stopShiftInterval() {
+  if (shiftInterval) {
+    clearInterval(shiftInterval);
+    shiftInterval = null;
+  }
+}
+
+function tickShift() {
+  if (!checkInTimestamp) return;
+
+  const now = Date.now();
+  const totalElapsedSeconds = Math.floor((now - checkInTimestamp) / 1000);
+  const activeBreakSeconds = onBreak ? Math.floor((now - (breakStartTimestamp || now)) / 1000) : 0;
+  const totalBreakSeconds = cumulativeBreakSeconds + activeBreakSeconds;
+  const totalWorkSeconds = Math.max(0, totalElapsedSeconds - totalBreakSeconds);
+
+  const remainingSeconds = Math.max(0, 8 * 3600 - totalWorkSeconds);
+  const overtimeSeconds = Math.max(0, totalWorkSeconds - 8 * 3600);
+
+  // Update primary dashboard timer
+  $('timer-disp').textContent = fmtHHMMSS(totalWorkSeconds);
+
+  // Update shift status UI
+  if (onBreak) {
+    $('timer-dot').classList.add('hidden');
+    if (breakType === 'auto') {
+      $('shift-status-badge').textContent = 'Auto-Break';
+      $('shift-status-badge').style.cssText = 'background:var(--warn-bg);color:var(--warn);';
+      $('timer-label').textContent = 'Shift paused — Out of Bounds';
+    } else {
+      $('shift-status-badge').textContent = 'On Break';
+      $('shift-status-badge').style.cssText = 'background:var(--warn-bg);color:var(--warn);';
+      $('timer-label').textContent = 'Shift paused — Manual Break';
+    }
+  } else {
+    $('timer-dot').classList.remove('hidden');
+    $('shift-status-badge').textContent = 'Active';
+    $('shift-status-badge').style.cssText = 'background:var(--success-bg);color:var(--success);';
+    $('timer-label').textContent = 'Shift running…';
+  }
+
+  // Update details table
+  if ($('td-net')) $('td-net').textContent = `${(totalWorkSeconds / 3600).toFixed(2)} hrs`;
+  if ($('td-break-total')) $('td-break-total').textContent = `${(totalBreakSeconds / 3600).toFixed(2)} hrs (${fmtHHMMSS(totalBreakSeconds)})`;
+  if ($('td-remaining')) $('td-remaining').textContent = `${(remainingSeconds / 3600).toFixed(2)} hrs (${fmtHHMMSS(remainingSeconds)})`;
+  if ($('td-overtime')) $('td-overtime').textContent = `${(overtimeSeconds / 3600).toFixed(2)} hrs (${fmtHHMMSS(overtimeSeconds)})`;
+
+  // Update break timer alert on dashboard
+  const breakTimerLbl = $('break-timer-lbl');
+  if (breakTimerLbl) {
+    const limit = 3600; // 1 hour allowed
+    if (totalBreakSeconds > limit) {
+      const over = totalBreakSeconds - limit;
+      breakTimerLbl.textContent = `${fmtHHMMSS(totalBreakSeconds)} (Exceeded limit by ${fmtHHMMSS(over)})`;
+      breakTimerLbl.style.color = 'var(--danger)';
+    } else {
+      const left = limit - totalBreakSeconds;
+      breakTimerLbl.textContent = `${fmtHHMMSS(totalBreakSeconds)} (${fmtHHMMSS(left)} remaining)`;
+      breakTimerLbl.style.color = 'var(--warn)';
+    }
+  }
+
+  // Update buttons
+  const btnTxt = $('btn-break-text');
+  if (btnTxt) {
+    if (onBreak) {
+      if (breakType === 'manual') {
+        btnTxt.textContent = `Resume Shift (${fmtHHMMSS(totalBreakSeconds)})`;
+      } else {
+        btnTxt.textContent = `On Auto-Break (${fmtHHMMSS(totalBreakSeconds)})`;
+      }
+    } else {
+      btnTxt.textContent = `Start Break`;
+    }
+  }
+}
+
 function triggerAutoBreak(isActive) {
   if (isActive) {
     onBreak = true;
     breakType = 'auto';
     breakStartTimestamp = Date.now();
     
-    // Pause standard shift timer UI
-    clearInterval(timerInterval);
-    timerInterval = null;
-
     // Show Break warning HUD
     $('out-of-bounds-alert').classList.remove('hidden');
-    $('shift-status-badge').textContent = 'Auto-Break';
-    $('shift-status-badge').style.cssText = 'background:var(--warn-bg);color:var(--warn);';
-    $('timer-label').textContent = 'Shift paused — Out of Bounds';
-    $('timer-dot').classList.add('hidden');
-
-    // Run break depletion interval
-    if (breakTimerInterval) clearInterval(breakTimerInterval);
-    breakTimerInterval = setInterval(tickBreak, 1000);
-    tickBreak();
-
     $('btn-break').disabled = true;
     $('btn-break').innerHTML = '<i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">On Auto-Break</span>';
     lucide.createIcons();
@@ -444,32 +532,16 @@ function triggerAutoBreak(isActive) {
     addNotif(`Auto-Break triggered for ${currentUser.name} (Went Out of Office Geofence)`, '⚠️');
     toast("Auto-Break Active: You left the geofence!", "error");
   } else {
-    onBreak = false;
-    breakType = null;
-    // Calculate spent break seconds
     if (breakStartTimestamp) {
       const spent = Math.floor((Date.now() - breakStartTimestamp) / 1000);
       cumulativeBreakSeconds += spent;
-      breakSecondsRemaining = Math.max(0, breakSecondsRemaining - spent);
     }
     breakStartTimestamp = null;
+    onBreak = false;
+    breakType = null;
     
-    // Clear break depletion interval
-    clearInterval(breakTimerInterval);
-    breakTimerInterval = null;
-
     // Hide Break HUD
     $('out-of-bounds-alert').classList.add('hidden');
-    
-    // Resume standard shift timer UI
-    $('shift-status-badge').textContent = 'Active';
-    $('shift-status-badge').style.cssText = 'background:var(--success-bg);color:var(--success);';
-    $('timer-dot').classList.remove('hidden');
-    $('timer-label').textContent = 'Shift running…';
-    
-    timerInterval = setInterval(tickTimer, 1000);
-    tickTimer();
-
     $('btn-break').disabled = false;
     $('btn-break').innerHTML = '<i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">Start Break</span>';
     lucide.createIcons();
@@ -477,6 +549,7 @@ function triggerAutoBreak(isActive) {
     addNotif(`Shift resumed for ${currentUser.name} (Returned to Bounds)`, '✓');
     toast("Welcome back! Work timer resumed.", "success");
   }
+  tickShift();
 }
 
 function triggerManualBreak(isActive) {
@@ -485,18 +558,6 @@ function triggerManualBreak(isActive) {
     breakType = 'manual';
     breakStartTimestamp = Date.now();
     
-    clearInterval(timerInterval);
-    timerInterval = null;
-
-    $('shift-status-badge').textContent = 'On Break';
-    $('shift-status-badge').style.cssText = 'background:var(--warn-bg);color:var(--warn);';
-    $('timer-label').textContent = 'Shift paused — Manual Break';
-    $('timer-dot').classList.add('hidden');
-
-    if (breakTimerInterval) clearInterval(breakTimerInterval);
-    breakTimerInterval = setInterval(tickBreak, 1000);
-    tickBreak();
-
     $('btn-break').innerHTML = '<i data-lucide="play" style="width:15px;height:15px;"></i> <span id="btn-break-text">Resume Shift</span>';
     lucide.createIcons();
 
@@ -509,20 +570,8 @@ function triggerManualBreak(isActive) {
     if (breakStartTimestamp) {
       const spent = Math.floor((Date.now() - breakStartTimestamp) / 1000);
       cumulativeBreakSeconds += spent;
-      breakSecondsRemaining = Math.max(0, breakSecondsRemaining - spent);
     }
     breakStartTimestamp = null;
-
-    clearInterval(breakTimerInterval);
-    breakTimerInterval = null;
-
-    $('shift-status-badge').textContent = 'Active';
-    $('shift-status-badge').style.cssText = 'background:var(--success-bg);color:var(--success);';
-    $('timer-dot').classList.remove('hidden');
-    $('timer-label').textContent = 'Shift running…';
-
-    timerInterval = setInterval(tickTimer, 1000);
-    tickTimer();
 
     $('btn-break').innerHTML = '<i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">Start Break</span>';
     lucide.createIcons();
@@ -530,69 +579,7 @@ function triggerManualBreak(isActive) {
     addNotif(`${currentUser.name} resumed work from manual break`, '✓');
     toast("Work resumed from break", "success");
   }
-}
-
-function tickBreak() {
-  if (!breakStartTimestamp) return;
-  const currentSpent = Math.floor((Date.now() - breakStartTimestamp) / 1000);
-  const remaining = Math.max(0, breakSecondsRemaining - currentSpent);
-  
-  const minutes = Math.floor(remaining / 60);
-  const seconds = remaining % 60;
-  
-  const timerLbl = $('break-timer-lbl');
-  if (timerLbl) timerLbl.textContent = `${minutes}m ${String(seconds).padStart(2,'0')}s`;
-
-  const btnTxt = $('btn-break-text');
-  if (btnTxt) {
-    if (breakType === 'manual') {
-      btnTxt.textContent = `Resume Shift (${minutes}m ${String(seconds).padStart(2,'0')}s)`;
-    } else if (breakType === 'auto') {
-      btnTxt.textContent = `On Auto-Break (${minutes}m ${String(seconds).padStart(2,'0')}s)`;
-    }
-  }
-
-  if (remaining <= 0) {
-    // Break depleted! Stop timer completely and force logout / clockout
-    terminateShiftDueToBreakExpiration();
-  }
-}
-
-function terminateShiftDueToBreakExpiration() {
-  clearInterval(breakTimerInterval);
-  breakTimerInterval = null;
-  clearInterval(timerInterval);
-  timerInterval = null;
-  stopLocationTracking();
-
-  const now = new Date();
-  const today = getLocalISODate(now);
-  const time = fmtTime(now);
-
-  const logs = DB.get('attendance') || [];
-  const log = logs.find(l => l.empId === currentUser.id && l.date === today);
-  if (log && !log.checkOut) {
-    processShiftEnd(log, time);
-    log.status = 'Present';
-    DB.set('attendance', logs);
-  }
-
-  // Clear states
-  onBreak = false;
-  breakType = null;
-  checkInTimestamp = null;
-  $('btn-checkin').disabled = false;
-  $('btn-checkout').disabled = true;
-  $('btn-break').classList.add('hidden');
-  $('out-of-bounds-alert').classList.add('hidden');
-  $('shift-status-badge').textContent = 'Exceeded Break';
-  $('shift-status-badge').style.cssText = 'background:var(--danger-bg);color:var(--danger);';
-
-  addNotif(`Shift ended automatically for ${currentUser.name} (Exceeded 1-hour break zone limit)`, '🛑');
-  addEmail(currentUser.email, 'Shift Expired: Outside Zone Limit', `Hi ${currentUser.name},\n\nYour shift has been automatically clocked out because you spent more than 60 minutes outside the corporate geofence zone.\n\n— Time Clock HR`);
-  
-  alert("Shift automatically clocked out! You exceeded the maximum allowed break limit of 1 hour outside the corporate office zone.");
-  handleLogout();
+  tickShift();
 }
 
 // ─────────────────────────────────────────────
@@ -605,8 +592,6 @@ function handleBackgroundPause() {
 function handleForegroundResume() {
   if (!checkInTimestamp || !lastActiveTime) return;
 
-  const bgElapsedMs = Date.now() - lastActiveTime;
-  const bgElapsedSec = Math.floor(bgElapsedMs / 1000);
   lastActiveTime = null;
 
   // Immediately check location
@@ -619,35 +604,16 @@ function handleForegroundResume() {
     const isInside = (geo.ok !== false) || hasOutsideApproval;
 
     if (!isInside) {
-      // User was outside in the background
-      if (onBreak) {
-        // Simply deduct the background elapsed time from remaining break seconds
-        breakSecondsRemaining = Math.max(0, breakSecondsRemaining - bgElapsedSec);
-        if (breakSecondsRemaining <= 0) {
-          terminateShiftDueToBreakExpiration();
-        }
-      } else {
-        // Went out of bounds in background: switch to break and subtract remaining time
+      // User is outside now
+      if (!onBreak) {
+        // Went out of bounds in background: switch to break
         triggerAutoBreak(true);
-        breakSecondsRemaining = Math.max(0, breakSecondsRemaining - bgElapsedSec);
-        if (breakSecondsRemaining <= 0) {
-          terminateShiftDueToBreakExpiration();
-        }
       }
     } else {
       // User is inside now
-      if (onBreak) {
-        if (breakType === 'auto') {
-          // User was outside but returned. Deduct partial break time and resume
-          breakSecondsRemaining = Math.max(0, breakSecondsRemaining - bgElapsedSec);
-          triggerAutoBreak(false);
-        } else {
-          // Keep manual break, just deduct background elapsed time from remaining break
-          breakSecondsRemaining = Math.max(0, breakSecondsRemaining - bgElapsedSec);
-          if (breakSecondsRemaining <= 0) {
-            terminateShiftDueToBreakExpiration();
-          }
-        }
+      if (onBreak && breakType === 'auto') {
+        // User was outside but returned. Resume shift.
+        triggerAutoBreak(false);
       }
     }
   });
@@ -714,16 +680,20 @@ async function autoStartAttendanceFlow() {
   const isBypassed = geo.ok === true || geo.ok === null || hasOutsideApproval;
 
   if (!todayLog) {
-    if (!isBypassed) {
-      $('geo-block-msg').textContent = geo.msg;
+    if (isBypassed) {
+      $('geo-block').classList.remove('open');
+      updateLocStrip(hasOutsideApproval ? '✓ Outside Work/WFH Approved' : geo.msg, 'var(--success)');
+      setScanStatus('Face Camera Auto-Scan Active…');
+      setTimeout(() => startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin), 400);
+    } else {
       $('geo-block').classList.add('open');
-      setScanStatus('Outside permitted zone', 'var(--danger)');
-      return;
+      updateLocStrip(geo.msg, 'var(--warn)');
+      setScanStatus('Outside permitted office zone. Clock-in blocked.', 'var(--warn)');
+      $('btn-checkin').disabled = false;
+      $('btn-checkout').disabled = true;
     }
-
-    updateLocStrip(geo.msg, 'var(--success)');
-    setScanStatus('Face Camera Auto-Scan Active…');
-    setTimeout(() => startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin), 400);
+    // Always start continuous tracking to listen for geofence entry
+    startContinuousLocationTracking();
 
   } else if (!todayLog.checkOut) {
     // Clocked in but not checked out yet
@@ -995,16 +965,29 @@ function performScan(vidId, canvId, laserId, pulseId, fallId, mode, onSuccess) {
   }
 
   setTimeout(() => {
-    setScanStatus('✓ Identity Match Confirmed!', 'var(--success)');
-    stopCamera();
-    setTimeout(() => { onSuccess && onSuccess(); }, 600);
+    const simulateFailure = $('sim-face-fail') && $('sim-face-fail').checked;
+    if (simulateFailure) {
+      setScanStatus('✗ Face Verification Failed. Access Denied.', 'var(--danger)');
+      stopCamera();
+      toast('Face ID Match Failed. Try Again.', 'error');
+      if (mode === 'checkin') {
+        $('btn-checkin').disabled = false;
+        $('btn-checkout').disabled = true;
+      } else if (mode === 'checkout') {
+        $('btn-checkout').disabled = false;
+      }
+    } else {
+      setScanStatus('✓ Identity Match Confirmed!', 'var(--success)');
+      stopCamera();
+      setTimeout(() => { onSuccess && onSuccess(); }, 600);
+    }
   }, 1800);
 }
 
 // ─────────────────────────────────────────────
 // ATTENDANCE LOGGING CALLBACKS
 // ─────────────────────────────────────────────
-function afterCheckin() {
+async function afterCheckin() {
   const now   = new Date();
   const today = getLocalISODate(now);
   const time  = fmtTime(now);
@@ -1019,11 +1002,28 @@ function afterCheckin() {
   }
 
   checkInTimestamp = now;
-  breakSecondsRemaining = 3600;
   cumulativeBreakSeconds = 0;
   onBreak = false;
+  breakStartTimestamp = null;
+  breakType = null;
 
-  startTimer(now);
+  startShiftInterval();
+
+  const geo = await checkGeofence();
+  const hasOutsideApproval = (DB.get('outside_work') || []).some(
+    w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
+  );
+  const isInside = geo.ok === true || geo.ok === null || hasOutsideApproval;
+
+  if (!isInside) {
+    triggerAutoBreak(true);
+  } else {
+    $('shift-status-badge').textContent = 'Active';
+    $('shift-status-badge').style.cssText = 'background:var(--success-bg);color:var(--success);';
+    $('timer-dot').classList.remove('hidden');
+    $('timer-label').textContent = 'Shift running…';
+  }
+
   startContinuousLocationTracking();
 
   $('btn-checkin').disabled  = true;
@@ -1031,8 +1031,6 @@ function afterCheckin() {
   $('btn-break').classList.remove('hidden');
   $('btn-break').innerHTML = '<i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">Start Break</span>';
   lucide.createIcons();
-  $('shift-status-badge').textContent = 'Active';
-  $('shift-status-badge').style.cssText = 'background:var(--success-bg);color:var(--success);';
 
   $('td-checkin').textContent = time;
 
@@ -1086,9 +1084,7 @@ function startTimer(from) {
   checkInTimestamp = from;
   $('timer-dot').classList.remove('hidden');
   $('timer-label').textContent = 'Shift running…';
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = setInterval(tickTimer, 1000);
-  tickTimer();
+  startShiftInterval();
 }
 
 function restoreTimer(from) {
@@ -1105,9 +1101,7 @@ function restoreTimer(from) {
 
   updateTimerDetailsDOM();
 
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = setInterval(tickTimer, 1000);
-  tickTimer();
+  startShiftInterval();
 }
 
 function updateTimerDetailsDOM() {
@@ -1143,10 +1137,21 @@ function updateTimerDetailsDOM() {
 
 function processShiftEnd(log, time) {
   log.checkOut = time;
-  const inMin  = toMin(log.checkIn);
-  const outMin = toMin(time);
-  const netMin = outMin - inMin - 60; // minus 1hr break
-  const netHrs = Math.max(0, netMin / 60);
+  
+  // Finish any active break first
+  if (onBreak && breakStartTimestamp) {
+    const spent = Math.floor((Date.now() - breakStartTimestamp) / 1000);
+    cumulativeBreakSeconds += spent;
+    onBreak = false;
+    breakStartTimestamp = null;
+  }
+  
+  const totalElapsed = Math.floor((Date.now() - checkInTimestamp) / 1000);
+  const actualBreakSec = cumulativeBreakSeconds;
+  const actualWorkSec = Math.max(0, totalElapsed - actualBreakSec);
+  
+  const netHrs = actualWorkSec / 3600;
+  const breakHrs = actualBreakSec / 3600;
 
   const emps = DB.get('employees') || [];
   const emp = emps.find(e => e.id === currentUser.id);
@@ -1184,6 +1189,7 @@ function processShiftEnd(log, time) {
 
     // Update log fields
     log.netHours = parseFloat(netHrs.toFixed(2));
+    log.breakHours = parseFloat(breakHrs.toFixed(2));
     log.overtime = parseFloat(generatedOT.toFixed(2));
     log.requiredHours = parseFloat(reqHrsToday.toFixed(2));
     log.timeCutUsed = parseFloat(currentCut.toFixed(2));
@@ -1216,21 +1222,13 @@ function processShiftEnd(log, time) {
     DB.set('employees', emps);
   } else {
     log.netHours = parseFloat(netHrs.toFixed(2));
-    log.overtime = Math.max(0, log.netHours - NET_WORK_HOURS);
+    log.breakHours = parseFloat(breakHrs.toFixed(2));
+    log.overtime = Math.max(0, log.netHours - 8);
   }
 }
 
-function tickTimer() {
-  if (!checkInTimestamp) return;
-  const elapsed = Math.floor((Date.now() - checkInTimestamp) / 1000);
-  $('timer-disp').textContent = fmtHHMMSS(elapsed);
-  const hrs = Math.max(0, (elapsed / 3600) - BREAK_HOURS);
-  $('td-net').textContent = hrs.toFixed(2) + ' hrs';
-}
-
 function stopTimer() {
-  clearInterval(timerInterval);
-  timerInterval = null;
+  stopShiftInterval();
   checkInTimestamp = null;
   $('timer-dot').classList.add('hidden');
   $('timer-label').textContent = 'Shift inactive';
@@ -2426,14 +2424,13 @@ function wireEventListeners() {
   if (toggleBtn) {
     toggleBtn.addEventListener('click', () => {
       const passInput = $('l-pass');
-      const icon = toggleBtn.querySelector('i');
-      if (passInput && icon) {
+      if (passInput) {
         if (passInput.type === 'password') {
           passInput.type = 'text';
-          icon.setAttribute('data-lucide', 'eye-off');
+          toggleBtn.innerHTML = '<i data-lucide="eye-off" style="width:18px;height:18px;"></i>';
         } else {
           passInput.type = 'password';
-          icon.setAttribute('data-lucide', 'eye');
+          toggleBtn.innerHTML = '<i data-lucide="eye" style="width:18px;height:18px;"></i>';
         }
         lucide.createIcons();
       }
@@ -2454,7 +2451,6 @@ function wireEventListeners() {
   $('geo-logout-btn').addEventListener('click', handleLogout);
 
   $('geo-retry-btn').addEventListener('click', async () => {
-    $('geo-block').classList.remove('open');
     setScanStatus('Verifying location…');
     const geo = await checkGeofence();
     updateGeoIndicator(geo);
@@ -2463,40 +2459,51 @@ function wireEventListeners() {
     const hasOutsideApproval = (DB.get('outside_work') || []).some(
       w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
     );
+    const isBypassed = geo.ok === true || geo.ok === null || hasOutsideApproval;
 
-    const isAllowed = geo.ok === true || geo.ok === null || hasOutsideApproval;
-
-    if (!isAllowed) {
-      $('geo-block-msg').textContent = geo.msg;
-      $('geo-block').classList.add('open');
-    } else {
-      updateLocStrip(geo.msg, 'var(--success)');
+    if (isBypassed) {
+      $('geo-block').classList.remove('open');
+      updateLocStrip(hasOutsideApproval ? '✓ Outside Work/WFH Approved' : geo.msg, 'var(--success)');
       startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin);
+    } else {
+      $('geo-block').classList.add('open');
+      updateLocStrip(geo.msg, 'var(--warn)');
+      toast('Still outside the permitted office zone.', 'error');
     }
   });
 
   $('btn-checkin').addEventListener('click', async () => {
+    $('btn-checkin').disabled = true;
     setScanStatus('Reading positioning metadata…');
     $('loc-strip').style.display = 'flex';
     updateLocStrip('Contacting satellites…', 'var(--text3)');
 
     const geo = await checkGeofence();
-    updateGeoIndicator(geo);
-
     const today = getLocalISODate();
     const hasOutsideApproval = (DB.get('outside_work') || []).some(
       w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
     );
+    const isBypassed = geo.ok === true || geo.ok === null || hasOutsideApproval;
 
-    const isAllowed = geo.ok === true || geo.ok === null || hasOutsideApproval;
+    updateGeoIndicator({
+      ok: isBypassed,
+      dist: geo.dist,
+      msg: isBypassed ? (hasOutsideApproval ? '✓ Outside Work/WFH Approved' : geo.msg) : geo.msg
+    });
 
-    if (!isAllowed) {
-      $('geo-block-msg').textContent = geo.msg;
+    updateLocStrip(
+      hasOutsideApproval ? '✓ Outside Work/WFH Approved' : geo.msg,
+      isBypassed ? 'var(--success)' : 'var(--warn)'
+    );
+
+    if (isBypassed) {
+      $('geo-block').classList.remove('open');
+      startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin);
+    } else {
       $('geo-block').classList.add('open');
-      return;
+      $('btn-checkin').disabled = false;
+      toast('Clock-in blocked: Outside permitted office zone.', 'error');
     }
-    updateLocStrip(geo.msg, 'var(--success)');
-    startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin);
   });
 
   $('btn-checkout').addEventListener('click', () => {
