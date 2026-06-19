@@ -154,7 +154,7 @@ function fmtHHMMSS(secs) {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   const s = secs % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function toMin(t) {
@@ -263,7 +263,7 @@ async function initDB() {
   }
 
   const adminId = 'EMP000';
-  const empId   = 'EMP001';
+  const empId = 'EMP001';
 
   DB.set('employees', [
     {
@@ -284,7 +284,7 @@ async function initDB() {
 
   DB.set('attendance', [
     { empId: empId, date: getLocalISODate(new Date(Date.now() - 864e5)), checkIn: '09:02', checkOut: '18:05', status: 'Present' },
-    { empId: empId, date: getLocalISODate(new Date(Date.now() - 2*864e5)), checkIn: '09:31', checkOut: '18:15', status: 'Late' },
+    { empId: empId, date: getLocalISODate(new Date(Date.now() - 2 * 864e5)), checkIn: '09:31', checkOut: '18:15', status: 'Late' },
   ]);
 
   DB.set('leaves', []);
@@ -308,7 +308,7 @@ async function initDB() {
 // ─────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 
-function openModal(id)  { $(id).classList.add('open'); }
+function openModal(id) { $(id).classList.add('open'); }
 function closeModal(id) { $(id).classList.remove('open'); }
 
 function showView(viewId) {
@@ -337,7 +337,7 @@ function toast(msg, type = 'info') {
     font-family:'Outfit',sans-serif;
     max-width:340px;box-shadow:0 8px 24px rgba(0,0,0,0.15);
     animation:fadeSlide 0.35s ease;
-    background:${type==='success'?'#10b981':type==='error'?'#ef4444':'#4f46e5'};
+    background:${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#4f46e5'};
     color:white;
   `;
   el.textContent = msg;
@@ -347,17 +347,17 @@ function toast(msg, type = 'info') {
 
 function badge(status) {
   const map = {
-    'Present':  'badge-green',
-    'Late':     'badge-yellow',
-    'Absent':   'badge-red',
+    'Present': 'badge-green',
+    'Late': 'badge-yellow',
+    'Absent': 'badge-red',
     'On Leave': 'badge-purple',
-    'Pending':  'badge-yellow',
+    'Pending': 'badge-yellow',
     'Approved': 'badge-green',
     'Rejected': 'badge-red',
-    'Paid':     'badge-green',
-    'Unpaid':   'badge-red',
+    'Paid': 'badge-green',
+    'Unpaid': 'badge-red',
   };
-  return `<span class="badge ${map[status]||'badge-blue'}">${status}</span>`;
+  return `<span class="badge ${map[status] || 'badge-blue'}">${status}</span>`;
 }
 
 function addNotif(msg, icon = '🔔') {
@@ -384,7 +384,7 @@ function startContinuousLocationTracking() {
 
       const dist = haversineMeters(fence.lat, fence.lng, pos.coords.latitude, pos.coords.longitude);
       const today = getLocalISODate();
-      
+
       // Check for approved Outside Work bypass
       const hasOutsideApproval = (DB.get('outside_work') || []).some(
         w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
@@ -522,7 +522,7 @@ function triggerAutoBreak(isActive) {
     onBreak = true;
     breakType = 'auto';
     breakStartTimestamp = Date.now();
-    
+
     // Show Break warning HUD
     $('out-of-bounds-alert').classList.remove('hidden');
     $('btn-break').disabled = true;
@@ -539,7 +539,7 @@ function triggerAutoBreak(isActive) {
     breakStartTimestamp = null;
     onBreak = false;
     breakType = null;
-    
+
     // Hide Break HUD
     $('out-of-bounds-alert').classList.add('hidden');
     $('btn-break').disabled = false;
@@ -557,7 +557,7 @@ function triggerManualBreak(isActive) {
     onBreak = true;
     breakType = 'manual';
     breakStartTimestamp = Date.now();
-    
+
     $('btn-break').innerHTML = '<i data-lucide="play" style="width:15px;height:15px;"></i> <span id="btn-break-text">Resume Shift</span>';
     lucide.createIcons();
 
@@ -566,7 +566,7 @@ function triggerManualBreak(isActive) {
   } else {
     onBreak = false;
     breakType = null;
-    
+
     if (breakStartTimestamp) {
       const spent = Math.floor((Date.now() - breakStartTimestamp) / 1000);
       cumulativeBreakSeconds += spent;
@@ -625,9 +625,9 @@ function handleForegroundResume() {
 function handleLogin(e) {
   e.preventDefault();
   const email = $('l-email').value.trim().toLowerCase();
-  const pass  = $('l-pass').value;
-  const emps  = DB.get('employees') || [];
-  const user  = emps.find(u => u.email.toLowerCase() === email && u.password === pass);
+  const pass = $('l-pass').value;
+  const emps = DB.get('employees') || [];
+  const user = emps.find(u => u.email.toLowerCase() === email && u.password === pass);
 
   if (!user) {
     toast('Invalid email or password', 'error');
@@ -656,7 +656,7 @@ function handleLogin(e) {
 
 async function autoStartAttendanceFlow() {
   const today = getLocalISODate();
-  const logs   = (DB.get('attendance') || []).filter(l => l.empId === currentUser.id && l.date === today);
+  const logs = (DB.get('attendance') || []).filter(l => l.empId === currentUser.id && l.date === today);
   const todayLog = logs[0];
 
   if (todayLog && todayLog.checkOut) {
@@ -705,7 +705,7 @@ async function autoStartAttendanceFlow() {
     $('btn-break').classList.remove('hidden');
     $('btn-break').innerHTML = '<i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">Start Break</span>';
     lucide.createIcons();
-    
+
     // Start continuous tracking
     startContinuousLocationTracking();
   }
@@ -730,21 +730,21 @@ function handleLogout() {
 // SIDEBAR / PANEL ROUTING
 // ─────────────────────────────────────────────
 const adminNav = [
-  { view: 'v-admin-dash',     icon: 'layout-dashboard', label: 'Dashboard' },
-  { view: 'v-admin-emp',      icon: 'users',            label: 'Employees' },
-  { view: 'v-admin-att',      icon: 'calendar-clock',   label: 'Attendance' },
-  { view: 'v-admin-outside',  icon: 'map-pin',          label: 'Outside Work' },
-  { view: 'v-admin-leaves',   icon: 'mail-open',        label: 'Leave Requests' },
-  { view: 'v-admin-holidays', icon: 'calendar',         label: 'Holidays' },
-  { view: 'v-admin-payroll',  icon: 'banknote',         label: 'Payroll' },
-  { view: 'v-admin-tasks',    icon: 'list-todo',        label: 'Assign Tasks' },
+  { view: 'v-admin-dash', icon: 'layout-dashboard', label: 'Dashboard' },
+  { view: 'v-admin-emp', icon: 'users', label: 'Employees' },
+  { view: 'v-admin-att', icon: 'calendar-clock', label: 'Attendance' },
+  { view: 'v-admin-outside', icon: 'map-pin', label: 'Outside Work' },
+  { view: 'v-admin-leaves', icon: 'mail-open', label: 'Leave Requests' },
+  { view: 'v-admin-holidays', icon: 'calendar', label: 'Holidays' },
+  { view: 'v-admin-payroll', icon: 'banknote', label: 'Payroll' },
+  { view: 'v-admin-tasks', icon: 'list-todo', label: 'Assign Tasks' },
 ];
 
 const empNav = [
-  { view: 'v-emp-dash',   icon: 'layout-dashboard', label: 'Dashboard' },
-  { view: 'v-emp-logs',   icon: 'calendar-clock',   label: 'My Attendance' },
-  { view: 'v-emp-leaves', icon: 'mail-open',         label: 'Leaves & Payslips' },
-  { view: 'v-emp-tasks',  icon: 'list-todo',        label: 'Daily Tasks' },
+  { view: 'v-emp-dash', icon: 'layout-dashboard', label: 'Dashboard' },
+  { view: 'v-emp-logs', icon: 'calendar-clock', label: 'My Attendance' },
+  { view: 'v-emp-leaves', icon: 'mail-open', label: 'Leaves & Payslips' },
+  { view: 'v-emp-tasks', icon: 'list-todo', label: 'Daily Tasks' },
 ];
 
 function buildSidebar() {
@@ -762,18 +762,18 @@ function buildSidebar() {
       showView(item.view);
       $('page-title').textContent = item.label;
       switch (item.view) {
-        case 'v-admin-dash':     loadAdminDash(); break;
-        case 'v-admin-emp':      renderEmpDir(); break;
-        case 'v-admin-att':      renderAttLogs(); break;
-        case 'v-admin-outside':  renderOutsideApprovals(); break;
-        case 'v-admin-leaves':   renderLeaveApprovals(); break;
+        case 'v-admin-dash': loadAdminDash(); break;
+        case 'v-admin-emp': renderEmpDir(); break;
+        case 'v-admin-att': renderAttLogs(); break;
+        case 'v-admin-outside': renderOutsideApprovals(); break;
+        case 'v-admin-leaves': renderLeaveApprovals(); break;
         case 'v-admin-holidays': renderCalendar(); renderHolidays(); break;
-        case 'v-admin-payroll':  renderPayroll(); break;
-        case 'v-admin-tasks':    renderAdminTasks(); break;
-        case 'v-emp-dash':       loadEmpDash(); break;
-        case 'v-emp-logs':       renderEmpLogs(); break;
-        case 'v-emp-leaves':     renderEmpLeaves(); break;
-        case 'v-emp-tasks':      renderEmpTasks(); break;
+        case 'v-admin-payroll': renderPayroll(); break;
+        case 'v-admin-tasks': renderAdminTasks(); break;
+        case 'v-emp-dash': loadEmpDash(); break;
+        case 'v-emp-logs': renderEmpLogs(); break;
+        case 'v-emp-leaves': renderEmpLeaves(); break;
+        case 'v-emp-tasks': renderEmpTasks(); break;
       }
       lucide.createIcons();
       if (window.innerWidth < 768) {
@@ -874,11 +874,11 @@ function updateBottomNavActiveItem() {
 
 function updateHeader() {
   const now = new Date();
-  $('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+  $('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function updateGeoIndicator(geo) {
-  const dot  = $('geo-dot');
+  const dot = $('geo-dot');
   const text = $('geo-status-text');
   if (!dot || !text) return;
   if (geo.ok === true) {
@@ -938,14 +938,14 @@ function stopCamera() {
     cameraStream.getTracks().forEach(t => t.stop());
     cameraStream = null;
   }
-  ['cam-feed','cam-canvas','modal-cam','modal-canvas'].forEach(id => $(id)?.classList.add('hidden'));
-  ['cam-fallback','modal-fallback'].forEach(id => $(id)?.classList.remove('hidden'));
-  ['scan-laser','scan-pulse','modal-laser','modal-pulse'].forEach(id => $(id)?.classList.add('hidden'));
+  ['cam-feed', 'cam-canvas', 'modal-cam', 'modal-canvas'].forEach(id => $(id)?.classList.add('hidden'));
+  ['cam-fallback', 'modal-fallback'].forEach(id => $(id)?.classList.remove('hidden'));
+  ['scan-laser', 'scan-pulse', 'modal-laser', 'modal-pulse'].forEach(id => $(id)?.classList.add('hidden'));
 }
 
 function performScan(vidId, canvId, laserId, pulseId, fallId, mode, onSuccess) {
   setScanStatus('🔍 Scanning face features…', 'var(--accent)');
-  const vid  = $(vidId);
+  const vid = $(vidId);
   const canv = $(canvId);
   if (canv && vid) {
     const ctx = canv.getContext('2d');
@@ -954,13 +954,13 @@ function performScan(vidId, canvId, laserId, pulseId, fallId, mode, onSuccess) {
     canv.width = W; canv.height = H;
     ctx.save();
     ctx.scale(-1, 1);
-    try { ctx.drawImage(vid, -W, 0, W, H); } catch(e) {}
+    try { ctx.drawImage(vid, -W, 0, W, H); } catch (e) { }
     ctx.restore();
     ctx.strokeStyle = 'rgba(16,185,129,0.7)';
     ctx.lineWidth = 2;
     ctx.setLineDash([8, 4]);
     ctx.beginPath();
-    ctx.arc(W/2, H/2, W/2 - 6, 0, Math.PI * 2);
+    ctx.arc(W / 2, H / 2, W / 2 - 6, 0, Math.PI * 2);
     ctx.stroke();
   }
 
@@ -988,10 +988,10 @@ function performScan(vidId, canvId, laserId, pulseId, fallId, mode, onSuccess) {
 // ATTENDANCE LOGGING CALLBACKS
 // ─────────────────────────────────────────────
 async function afterCheckin() {
-  const now   = new Date();
+  const now = new Date();
   const today = getLocalISODate(now);
-  const time  = fmtTime(now);
-  const hour  = now.getHours();
+  const time = fmtTime(now);
+  const hour = now.getHours();
   const status = hour > 9 || (hour === 9 && now.getMinutes() > 5) ? 'Late' : 'Present';
 
   const logs = DB.get('attendance') || [];
@@ -1026,7 +1026,7 @@ async function afterCheckin() {
 
   startContinuousLocationTracking();
 
-  $('btn-checkin').disabled  = true;
+  $('btn-checkin').disabled = true;
   $('btn-checkout').disabled = false;
   $('btn-break').classList.remove('hidden');
   $('btn-break').innerHTML = '<i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">Start Break</span>';
@@ -1051,12 +1051,12 @@ async function afterCheckin() {
 }
 
 function afterCheckout() {
-  const now   = new Date();
+  const now = new Date();
   const today = getLocalISODate(now);
-  const time  = fmtTime(now);
+  const time = fmtTime(now);
 
   const logs = DB.get('attendance') || [];
-  const log  = logs.find(l => l.empId === currentUser.id && l.date === today);
+  const log = logs.find(l => l.empId === currentUser.id && l.date === today);
   if (log) {
     processShiftEnd(log, time);
     DB.set('attendance', logs);
@@ -1065,7 +1065,7 @@ function afterCheckout() {
   stopTimer();
   stopLocationTracking();
 
-  $('btn-checkin').disabled  = false;
+  $('btn-checkin').disabled = false;
   $('btn-checkout').disabled = true;
   $('btn-break').classList.add('hidden');
   $('shift-status-badge').textContent = 'Completed';
@@ -1092,7 +1092,7 @@ function restoreTimer(from) {
   $('timer-dot').classList.remove('hidden');
   $('timer-label').textContent = 'Shift running…';
   $('td-checkin').textContent = fmtTime(from);
-  
+
   const currentCut = currentUser.timeCut || 0;
   const currentDebt = currentUser.timeDebt || 0;
   const reqDurationHours = 9 - currentCut + currentDebt;
@@ -1137,7 +1137,7 @@ function updateTimerDetailsDOM() {
 
 function processShiftEnd(log, time) {
   log.checkOut = time;
-  
+
   // Finish any active break first
   if (onBreak && breakStartTimestamp) {
     const spent = Math.floor((Date.now() - breakStartTimestamp) / 1000);
@@ -1145,11 +1145,11 @@ function processShiftEnd(log, time) {
     onBreak = false;
     breakStartTimestamp = null;
   }
-  
+
   const totalElapsed = Math.floor((Date.now() - checkInTimestamp) / 1000);
   const actualBreakSec = cumulativeBreakSeconds;
   const actualWorkSec = Math.max(0, totalElapsed - actualBreakSec);
-  
+
   const netHrs = actualWorkSec / 3600;
   const breakHrs = actualBreakSec / 3600;
 
@@ -1238,12 +1238,12 @@ function stopTimer() {
 // EMPLOYEE INTERFACES & DASHBOARDS
 // ─────────────────────────────────────────────
 function loadEmpDash() {
-  const today   = getLocalISODate();
-  const now     = new Date();
-  const yr      = now.getFullYear();
-  const mo      = now.getMonth();
-  const logs    = (DB.get('attendance') || []).filter(l => l.empId === currentUser.id);
-  const moLogs  = logs.filter(l => {
+  const today = getLocalISODate();
+  const now = new Date();
+  const yr = now.getFullYear();
+  const mo = now.getMonth();
+  const logs = (DB.get('attendance') || []).filter(l => l.empId === currentUser.id);
+  const moLogs = logs.filter(l => {
     const d = new Date(l.date + 'T00:00:00');
     return d.getFullYear() === yr && d.getMonth() === mo;
   });
@@ -1278,9 +1278,9 @@ function loadEmpDash() {
   }
 
   if (todayLog && todayLog.checkIn) {
-    const inMin  = toMin(todayLog.checkIn);
-    const outMin = todayLog.checkOut ? toMin(todayLog.checkOut) : (now.getHours()*60 + now.getMinutes());
-    const hrs    = Math.max(0, (outMin - inMin - 60) / 60);
+    const inMin = toMin(todayLog.checkIn);
+    const outMin = todayLog.checkOut ? toMin(todayLog.checkOut) : (now.getHours() * 60 + now.getMinutes());
+    const hrs = Math.max(0, (outMin - inMin - 60) / 60);
     $('e-kpi-shift').textContent = `${Math.floor(hrs)}h ${Math.round((hrs % 1) * 60)}m`;
   }
 
@@ -1312,10 +1312,10 @@ function renderEmpLogs() {
   $('emp-log-tbody').innerHTML = logs.reverse().map(l => `
     <tr>
       <td data-label="Date">${l.date}</td>
-      <td data-label="Check In">${l.checkIn||'—'}</td>
-      <td data-label="Check Out">${l.checkOut||'—'}</td>
-      <td data-label="Work Hrs">${l.netHours??'—'}</td>
-      <td data-label="Overtime">${l.overtime?l.overtime+' hrs':'—'}</td>
+      <td data-label="Check In">${l.checkIn || '—'}</td>
+      <td data-label="Check Out">${l.checkOut || '—'}</td>
+      <td data-label="Work Hrs">${l.netHours ?? '—'}</td>
+      <td data-label="Overtime">${l.overtime ? l.overtime + ' hrs' : '—'}</td>
       <td data-label="Status">${badge(l.status)}</td>
     </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text2);">No attendance.</td></tr>';
 }
@@ -1324,10 +1324,10 @@ function renderEmpLogs() {
 // LEAVES & OUTSIDE WORK
 // ─────────────────────────────────────────────
 function renderEmpLeaves() {
-  const u   = currentUser;
-  const lb  = u.leaveBalance || { Annual: 21, Sick: 10, Casual: 7, Holiday: 0 };
+  const u = currentUser;
+  const lb = u.leaveBalance || { Annual: 21, Sick: 10, Casual: 7, Holiday: 0 };
   $('bal-annual').textContent = lb.Annual;
-  $('bal-sick').textContent   = lb.Sick;
+  $('bal-sick').textContent = lb.Sick;
   $('bal-casual').textContent = lb.Casual;
   $('bal-holiday').textContent = lb.Holiday || 0;
 
@@ -1354,10 +1354,10 @@ function renderEmpLeaves() {
 
 function handleLeaveApply(e) {
   e.preventDefault();
-  let type     = $('lv-type').value;
-  const start  = $('lv-start').value;
+  let type = $('lv-type').value;
+  const start = $('lv-start').value;
   const isHalf = ($('lv-halfday') && $('lv-halfday').checked) || type.startsWith('Half-Day ');
-  const end    = isHalf ? start : $('lv-end').value;
+  const end = isHalf ? start : $('lv-end').value;
   const reason = $('lv-reason').value;
   if (!start || !end || end < start) { toast('Invalid date range.', 'error'); return; }
 
@@ -1366,15 +1366,15 @@ function handleLeaveApply(e) {
     type = type.replace('Half-Day ', '');
   }
 
-  DB.push('leaves', { 
-    empId: currentUser.id, 
-    empName: currentUser.name, 
-    type, 
-    start, 
-    end, 
-    halfDay: isHalf, 
-    reason, 
-    status: 'Pending' 
+  DB.push('leaves', {
+    empId: currentUser.id,
+    empName: currentUser.name,
+    type,
+    start,
+    end,
+    halfDay: isHalf,
+    reason,
+    status: 'Pending'
   });
   addNotif(`New leave application: ${type}${isHalf ? ' (Half-Day)' : ''} on ${start}`, '📋');
   addEmail('admin@company.com', `Leave Request — ${currentUser.name}`, `${currentUser.name} requested leave: ${type}${isHalf ? ' (Half-Day)' : ''}.\nReason: ${reason}`);
@@ -1462,7 +1462,7 @@ function respondOutsideWork(idx, status) {
 
   addNotif(`Outside Work request ${status} for ${requests[idx].empName}`, status === 'Approved' ? '✅' : '❌');
   addEmail(requests[idx].empId, `Outside Work Request ${status}`, `Hi ${requests[idx].empName},\n\nYour request for Outside Work (${requests[idx].type}) on ${requests[idx].date} was ${status}.\n\n— HR Admin`);
-  
+
   toast(`Outside Work ${status}!`, status === 'Approved' ? 'success' : 'error');
   renderOutsideApprovals();
 
@@ -1484,8 +1484,8 @@ function respondOutsideWork(idx, status) {
 // ADMIN DASHBOARD
 // ─────────────────────────────────────────────
 function loadAdminDash() {
-  const emps  = (DB.get('employees') || []).filter(e => e.role !== 'Admin');
-  const atts  = DB.get('attendance') || [];
+  const emps = (DB.get('employees') || []).filter(e => e.role !== 'Admin');
+  const atts = DB.get('attendance') || [];
   const today = getLocalISODate();
   const leaves = (DB.get('leaves') || []).filter(l => l.status === 'Pending');
   const fence = getGeofence();
@@ -1521,7 +1521,7 @@ function loadAdminDash() {
       <td data-label="Clock Out">${log.checkOut || '—'}</td>
       <td data-label="Work Hrs">${log.netHours ?? '—'}</td>
       <td data-label="OT">${log.overtime ? log.overtime + 'h' : '—'}</td>
-      <td data-label="Status">${badge(log.status || (todayLogs.find(l=>l.empId===emp.id)?log.status:'Absent'))}</td>
+      <td data-label="Status">${badge(log.status || (todayLogs.find(l => l.empId === emp.id) ? log.status : 'Absent'))}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text2);">No attendance data for today.</td></tr>';
 
@@ -1563,12 +1563,15 @@ function renderCharts(atts, emps) {
         borderSkipped: false,
       }]
     },
-    options: { responsive: true, maintainAspectRatio: false,
+    options: {
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { color: gridColor }, ticks: { color: textColor, font: { family: 'Outfit', size: 11 } } },
-        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { family: 'Outfit', size: 11 }, stepSize: 1 },
-             beginAtZero: true, max: Math.max(emps.length, 3) },
+        y: {
+          grid: { color: gridColor }, ticks: { color: textColor, font: { family: 'Outfit', size: 11 }, stepSize: 1 },
+          beginAtZero: true, max: Math.max(emps.length, 3)
+        },
       }
     }
   });
@@ -1580,11 +1583,14 @@ function renderCharts(atts, emps) {
     type: 'doughnut',
     data: {
       labels: Object.keys(depts),
-      datasets: [{ data: Object.values(depts),
-        backgroundColor: ['#4f46e5','#a855f7','#10b981','#f59e0b','#ef4444'],
-        borderWidth: 0, hoverOffset: 6 }]
+      datasets: [{
+        data: Object.values(depts),
+        backgroundColor: ['#4f46e5', '#a855f7', '#10b981', '#f59e0b', '#ef4444'],
+        borderWidth: 0, hoverOffset: 6
+      }]
     },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '70%',
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '70%',
       plugins: { legend: { position: 'bottom', labels: { color: textColor, font: { family: 'Outfit', size: 12 }, padding: 14 } } }
     }
   });
@@ -1605,8 +1611,8 @@ function renderEmpDir() {
       <td data-label="Name" style="font-weight:600;">${emp.name}</td>
       <td data-label="Email">${emp.email}</td>
       <td data-label="Dept.">${emp.dept}</td>
-      <td data-label="Role"><span class="badge ${emp.role==='Admin'?'badge-purple':'badge-blue'}">${emp.role}</span></td>
-      <td data-label="Salary">$${(emp.salary||0).toLocaleString()}</td>
+      <td data-label="Role"><span class="badge ${emp.role === 'Admin' ? 'badge-purple' : 'badge-blue'}">${emp.role}</span></td>
+      <td data-label="Salary">$${(emp.salary || 0).toLocaleString()}</td>
       <td data-label="Time Debt">
         <span style="font-weight:600; color:${debt > 0 ? 'var(--danger)' : 'var(--text3)'};">${debt.toFixed(2)} hrs</span>
         ${waiveBtn}
@@ -1644,20 +1650,20 @@ function waiveDebt(id) {
 
 function editEmp(id) {
   const emps = DB.get('employees') || [];
-  const emp  = emps.find(e => e.id === id);
+  const emp = emps.find(e => e.id === id);
   if (!emp) return;
   $('emp-modal-title').textContent = 'Edit Employee';
   $('emp-edit-id').value = id;
-  $('ef-name').value   = emp.name;
-  $('ef-email').value  = emp.email;
-  $('ef-pwd').value    = emp.password;
-  $('ef-role').value   = emp.role;
-  $('ef-dept').value   = emp.dept;
-  $('ef-desg').value   = emp.designation;
+  $('ef-name').value = emp.name;
+  $('ef-email').value = emp.email;
+  $('ef-pwd').value = emp.password;
+  $('ef-role').value = emp.role;
+  $('ef-dept').value = emp.dept;
+  $('ef-desg').value = emp.designation;
   $('ef-salary').value = emp.salary;
-  $('ef-ot').value     = emp.otRate;
+  $('ef-ot').value = emp.otRate;
   $('ef-timedebt').value = emp.timeDebt || 0;
-  $('ef-timecut').value  = emp.timeCut || 0;
+  $('ef-timecut').value = emp.timeCut || 0;
   openModal('modal-emp');
 }
 
@@ -1671,42 +1677,42 @@ function deleteEmp(id) {
 
 function handleSaveEmp(e) {
   e.preventDefault();
-  const id   = $('emp-edit-id').value;
+  const id = $('emp-edit-id').value;
   const name = $('ef-name').value.trim();
-  const email= $('ef-email').value.trim().toLowerCase();
-  const pwd  = $('ef-pwd').value;
+  const email = $('ef-email').value.trim().toLowerCase();
+  const pwd = $('ef-pwd').value;
   const role = $('ef-role').value;
   const dept = $('ef-dept').value;
   const desg = $('ef-desg').value.trim();
-  const sal  = parseFloat($('ef-salary').value) || 0;
-  const ot   = parseFloat($('ef-ot').value) || 0;
+  const sal = parseFloat($('ef-salary').value) || 0;
+  const ot = parseFloat($('ef-ot').value) || 0;
   const timeDebt = parseFloat($('ef-timedebt').value) || 0;
-  const timeCut  = parseFloat($('ef-timecut').value) || 0;
+  const timeCut = parseFloat($('ef-timecut').value) || 0;
 
   const emps = DB.get('employees') || [];
 
   if (id) {
     const idx = emps.findIndex(e => e.id === id);
     if (idx >= 0) {
-      emps[idx] = { 
-        ...emps[idx], 
-        name, 
-        email, 
-        password: pwd, 
-        role, 
-        dept, 
-        designation: desg, 
-        salary: sal, 
+      emps[idx] = {
+        ...emps[idx],
+        name,
+        email,
+        password: pwd,
+        role,
+        dept,
+        designation: desg,
+        salary: sal,
         otRate: ot,
         timeDebt,
         timeCut
       };
-      
+
       if (currentUser && currentUser.id === id) {
         currentUser.timeDebt = timeDebt;
         currentUser.timeCut = timeCut;
       }
-      
+
       DB.set('employees', emps);
       toast('Employee profile saved!', 'success');
     }
@@ -1733,11 +1739,11 @@ function handleSaveEmp(e) {
 // MASTER ATTENDANCE LOG (ADMIN)
 // ─────────────────────────────────────────────
 function renderAttLogs() {
-  const dateF  = $('att-date-filter').value;
-  const deptF  = $('att-dept-filter').value;
-  const emps   = DB.get('employees') || [];
+  const dateF = $('att-date-filter').value;
+  const deptF = $('att-dept-filter').value;
+  const emps = DB.get('employees') || [];
   const allAtt = DB.get('attendance') || [];
-  let logs     = allAtt.map((l, index) => ({ ...l, originalIndex: index }));
+  let logs = allAtt.map((l, index) => ({ ...l, originalIndex: index }));
 
   if (dateF) logs = logs.filter(l => l.date === dateF);
   if (deptF !== 'ALL') {
@@ -1750,11 +1756,11 @@ function renderAttLogs() {
     return `<tr>
       <td data-label="Date">${l.date}</td>
       <td data-label="Emp ID">${l.empId}</td>
-      <td data-label="Name" style="font-weight:600;">${emp.name||'—'}</td>
-      <td data-label="Clock In">${l.checkIn||'—'}</td>
-      <td data-label="Clock Out">${l.checkOut||'—'}</td>
-      <td data-label="Work Hrs">${l.netHours??'—'}</td>
-      <td data-label="OT">${l.overtime?l.overtime+'h':'—'}</td>
+      <td data-label="Name" style="font-weight:600;">${emp.name || '—'}</td>
+      <td data-label="Clock In">${l.checkIn || '—'}</td>
+      <td data-label="Clock Out">${l.checkOut || '—'}</td>
+      <td data-label="Work Hrs">${l.netHours ?? '—'}</td>
+      <td data-label="OT">${l.overtime ? l.overtime + 'h' : '—'}</td>
       <td data-label="Status">${badge(l.status)}</td>
       <td data-label="Action">
         <button class="btn btn-secondary btn-sm" onclick="openEditAttendance(${l.originalIndex})" style="padding:4px 8px;font-size:12px;">
@@ -1809,7 +1815,7 @@ function handleSaveAttendance(e) {
     const netMin = outMin - inMin - 60; // minus 1hr break
     const netHrs = Math.max(0, netMin / 60);
     log.netHours = parseFloat(netHrs.toFixed(2));
-    
+
     // Calculate overtime based on employee contract
     const emps = DB.get('employees') || [];
     const emp = emps.find(e => e.id === log.empId);
@@ -1834,7 +1840,7 @@ function handleSaveAttendance(e) {
   closeModal('modal-edit-attendance');
   toast('Attendance record updated!', 'success');
   renderAttLogs();
-  
+
   if (currentUser?.role === 'Admin') {
     loadAdminDash();
   }
@@ -1864,16 +1870,16 @@ function renderLeaveApprovals() {
 
   $('leave-approve-tbody').innerHTML = filtered.map(l => `
     <tr>
-      <td data-label="Employee" style="font-weight:600;">${l.empName||'—'}</td>
+      <td data-label="Employee" style="font-weight:600;">${l.empName || '—'}</td>
       <td data-label="Type">${l.type}${l.halfDay ? ' (Half-Day)' : ''}</td>
       <td data-label="From → To">${l.start} → ${l.end}</td>
-      <td data-label="Reason" style="font-size:12px;max-width:120px;color:var(--text2);">${l.reason||'—'}</td>
+      <td data-label="Reason" style="font-size:12px;max-width:120px;color:var(--text2);">${l.reason || '—'}</td>
       <td data-label="Status">${badge(l.status)}</td>
       <td data-label="Action">
-        ${l.status==='Pending'?`
+        ${l.status === 'Pending' ? `
           <button class="btn btn-success btn-sm" onclick="respondLeave(${l.originalIndex},'Approved')">Approve</button>
           <button class="btn btn-danger btn-sm" onclick="respondLeave(${l.originalIndex},'Rejected')" style="margin-top:4px;">Reject</button>
-        `:'—'}
+        `: '—'}
       </td>
     </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text2);">No leave applications.</td></tr>';
 }
@@ -1885,12 +1891,12 @@ function respondLeave(idx, decision) {
 
   if (decision === 'Approved') {
     const emps = DB.get('employees') || [];
-    const emp  = emps.find(e => e.id === leaves[idx].empId);
+    const emp = emps.find(e => e.id === leaves[idx].empId);
     if (emp) {
       const isHalf = leaves[idx].halfDay || false;
       const days = isHalf ? 0.5 : (Math.round((new Date(leaves[idx].end) - new Date(leaves[idx].start)) / 864e5) + 1);
-      const lb   = emp.leaveBalance || { Annual: 21, Sick: 10, Casual: 7, Holiday: 0 };
-      const key  = leaves[idx].type.replace('Half-Day ', '');
+      const lb = emp.leaveBalance || { Annual: 21, Sick: 10, Casual: 7, Holiday: 0 };
+      const key = leaves[idx].type.replace('Half-Day ', '');
       if (lb[key] !== undefined) lb[key] = Math.max(0, lb[key] - days);
       emp.leaveBalance = lb;
       if (currentUser?.id === emp.id) { currentUser.leaveBalance = lb; }
@@ -1899,9 +1905,9 @@ function respondLeave(idx, decision) {
   }
 
   DB.set('leaves', leaves);
-  addNotif(`Leave ${decision} for ${leaves[idx].empName}`, decision==='Approved'?'✅':'❌');
+  addNotif(`Leave ${decision} for ${leaves[idx].empName}`, decision === 'Approved' ? '✅' : '❌');
   addEmail(leaves[idx].empId, `Leave application status`, `Hello,\\n\\nYour application has been ${decision}.\\n— Time Clock HR`);
-  toast(`Leave ${decision}!`, decision==='Approved'?'success':'error');
+  toast(`Leave ${decision}!`, decision === 'Approved' ? 'success' : 'error');
   renderLeaveApprovals();
 }
 
@@ -1914,9 +1920,9 @@ let calMonth = new Date().getMonth();
 function renderCalendar() {
   const holidays = DB.get('holidays') || [];
   const holDates = new Set(holidays.map(h => h.date));
-  const logs     = DB.get('attendance') || [];
+  const logs = DB.get('attendance') || [];
   const attDates = new Set(logs.map(l => l.date));
-  const today    = getLocalISODate();
+  const today = getLocalISODate();
 
   $('cal-month-label').textContent = monthLabel(new Date(calYear, calMonth, 1));
 
@@ -1925,7 +1931,7 @@ function renderCalendar() {
 
   const grid = $('cal-grid');
   grid.innerHTML = '';
-  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d => {
+  ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(d => {
     const el = document.createElement('div');
     el.className = 'cal-label';
     el.textContent = d;
@@ -1937,16 +1943,16 @@ function renderCalendar() {
   }
 
   for (let day = 1; day <= total; day++) {
-    const ds  = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const ds = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const dow = new Date(calYear, calMonth, day).getDay();
-    const el  = document.createElement('div');
+    const el = document.createElement('div');
     el.className = 'cal-day';
     el.textContent = day;
-    if (ds === today)        el.classList.add('today');
-    if (holDates.has(ds))    el.classList.add('holiday');
+    if (ds === today) el.classList.add('today');
+    if (holDates.has(ds)) el.classList.add('holiday');
     if (dow === 0 || dow === 6) el.classList.add('weekend');
-    if (attDates.has(ds))    el.classList.add('attend');
-    el.title = holDates.has(ds) ? holidays.find(h=>h.date===ds)?.name : '';
+    if (attDates.has(ds)) el.classList.add('attend');
+    el.title = holDates.has(ds) ? holidays.find(h => h.date === ds)?.name : '';
     grid.appendChild(el);
   }
 }
@@ -2006,17 +2012,17 @@ function renderPayroll() {
 function runPayroll() {
   const period = $('payroll-period').value;
   const [mm, yyyy] = period.split('-');
-  const mo   = parseInt(mm) - 1;
-  const yr   = parseInt(yyyy);
+  const mo = parseInt(mm) - 1;
+  const yr = parseInt(yyyy);
   const days = new Date(yr, mo + 1, 0).getDate();
 
-  const emps   = (DB.get('employees') || []).filter(e => e.role !== 'Admin');
-  const atts   = DB.get('attendance') || [];
-  const hols   = new Set((DB.get('holidays') || []).filter(h => h.date.startsWith(`${yyyy}-${mm}`)).map(h => h.date));
+  const emps = (DB.get('employees') || []).filter(e => e.role !== 'Admin');
+  const atts = DB.get('attendance') || [];
+  const hols = new Set((DB.get('holidays') || []).filter(h => h.date.startsWith(`${yyyy}-${mm}`)).map(h => h.date));
 
   let workDays = 0;
   for (let d = 1; d <= days; d++) {
-    const ds  = `${yyyy}-${mm}-${String(d).padStart(2,'0')}`;
+    const ds = `${yyyy}-${mm}-${String(d).padStart(2, '0')}`;
     const dow = new Date(yr, mo, d).getDay();
     if (dow !== 0 && dow !== 6 && !hols.has(ds)) workDays++;
   }
@@ -2034,29 +2040,29 @@ function runPayroll() {
       return y === yr && m === mo + 1;
     });
 
-    const present    = moLogs.filter(l => ['Present','Late'].includes(l.status)).length;
-    const absent     = Math.max(0, workDays - present);
+    const present = moLogs.filter(l => ['Present', 'Late'].includes(l.status)).length;
+    const absent = Math.max(0, workDays - present);
     const pendingDebt = emp.timeDebt || 0;
-    const otHrs      = moLogs.reduce((s, l) => s + (l.overtime || 0), 0);
+    const otHrs = moLogs.reduce((s, l) => s + (l.overtime || 0), 0);
 
-    const dailyRate  = emp.salary / workDays;
-    const basePay    = dailyRate * present;
-    
+    const dailyRate = emp.salary / workDays;
+    const basePay = dailyRate * present;
+
     // Overtime is compensated via time cuts & holiday leaves, so otPay = 0
-    const otPay      = 0;
-    
+    const otPay = 0;
+
     // Deduct absences + outstanding time debt at end of period
     const debtDeduction = pendingDebt * (dailyRate / 8);
     const deductions = (absent * dailyRate) + debtDeduction;
-    const netPay     = Math.max(0, basePay + otPay - deductions);
+    const netPay = Math.max(0, basePay + otPay - deductions);
 
     payrolls.push({
       empId: emp.id, empName: emp.name, period, workDays,
       present, absent, lateCount: 0, otHrs: parseFloat(otHrs.toFixed(2)),
       basePay: parseFloat(basePay.toFixed(2)),
-      otPay:   parseFloat(otPay.toFixed(2)),
+      otPay: parseFloat(otPay.toFixed(2)),
       deductions: parseFloat(deductions.toFixed(2)),
-      netPay:  parseFloat(netPay.toFixed(2)),
+      netPay: parseFloat(netPay.toFixed(2)),
       status: 'Paid',
       paidOn: getLocalISODate(),
       dept: emp.dept, designation: emp.designation,
@@ -2089,8 +2095,8 @@ function previewPayslip(i) {
     <div class="payslip-meta">
       <div><strong>Employee:</strong> ${p.empName}</div>
       <div><strong>ID:</strong> ${p.empId}</div>
-      <div><strong>Department:</strong> ${p.dept||'—'}</div>
-      <div><strong>Position:</strong> ${p.designation||'—'}</div>
+      <div><strong>Department:</strong> ${p.dept || '—'}</div>
+      <div><strong>Position:</strong> ${p.designation || '—'}</div>
       <div><strong>Pay Cycle:</strong> ${p.period}</div>
       <div><strong>Disbursed:</strong> ${p.paidOn}</div>
     </div>
@@ -2123,7 +2129,7 @@ function renderEmpPayslips() {
       <td data-label="Deductions" style="color:var(--danger);">$${p.deductions.toFixed(2)}</td>
       <td data-label="Net Pay" style="font-weight:800;color:var(--accent);">$${p.netPay.toFixed(2)}</td>
       <td data-label="Paid On">${p.paidOn}</td>
-      <td data-label="Action"><button class="btn btn-secondary btn-sm" onclick="previewPayslip(${(DB.get('payrolls')||[]).findIndex(x=>x.empId===currentUser.id&&x.period===p.period)})">
+      <td data-label="Action"><button class="btn btn-secondary btn-sm" onclick="previewPayslip(${(DB.get('payrolls') || []).findIndex(x => x.empId === currentUser.id && x.period === p.period)})">
         <i data-lucide="eye" style="width:14px;height:14px;"></i> View
       </button></td>
     </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text2);">No statements published.</td></tr>';
@@ -2225,7 +2231,7 @@ function handleTaskAssign(e) {
   DB.push('tasks', newTask);
   addNotif(`New task assigned to ${emp.name}: ${description.slice(0, 30)}...`, '📋');
   addEmail(emp.email, 'New Task Assigned', `Hi ${emp.name},\n\nHR Admin has assigned a new daily task to you for ${date}.\nDescription: ${description}\nPriority: ${priority}\n\n— Time Clock HR`);
-  
+
   toast('Task assigned successfully!', 'success');
   $('task-desc-input').value = '';
   renderAdminTasks();
@@ -2312,8 +2318,8 @@ function handleTaskUpdate(e) {
 // GEOFENCE SETTINGS
 // ─────────────────────────────────────────────
 function handleSaveGeofence() {
-  const lat    = parseFloat($('geo-lat').value);
-  const lng    = parseFloat($('geo-lng').value);
+  const lat = parseFloat($('geo-lat').value);
+  const lng = parseFloat($('geo-lng').value);
   const radius = parseFloat($('geo-radius').value) || 200;
 
   if (isNaN(lat) || isNaN(lng)) { toast('Coordinates required.', 'error'); return; }
@@ -2356,7 +2362,7 @@ async function bootApp() {
   // Initialize IndexedDB first
   try {
     await DBStore.init();
-    
+
     // Load database dumps into in-memory cached map
     const dbDump = await DBStore.getAll();
     dbDump.forEach(item => {
@@ -2439,12 +2445,12 @@ function wireEventListeners() {
 
   $('quick-admin').addEventListener('click', () => {
     $('l-email').value = 'admin@company.com';
-    $('l-pass').value  = 'Admin@1234';
+    $('l-pass').value = 'Admin@1234';
   });
 
   $('quick-emp').addEventListener('click', () => {
     $('l-email').value = 'employee@company.com';
-    $('l-pass').value  = 'Emp@1234';
+    $('l-pass').value = 'Emp@1234';
   });
 
   $('logout-btn').addEventListener('click', handleLogout);
@@ -2454,7 +2460,7 @@ function wireEventListeners() {
     setScanStatus('Verifying location…');
     const geo = await checkGeofence();
     updateGeoIndicator(geo);
-    
+
     const today = getLocalISODate();
     const hasOutsideApproval = (DB.get('outside_work') || []).some(
       w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
@@ -2572,10 +2578,10 @@ function wireEventListeners() {
 
   $('emp-log-filter').addEventListener('change', renderEmpLogs);
   const now = new Date();
-  $('emp-log-filter').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  $('emp-log-filter').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   $('leave-form').addEventListener('submit', handleLeaveApply);
-  
+
   // Sync Leave Type selection with Half-Day checkbox
   $('lv-type').addEventListener('change', () => {
     const typeVal = $('lv-type').value;
@@ -2671,7 +2677,7 @@ function wireEventListeners() {
     }
   });
 
-  ['modal-emp','modal-holiday','modal-payslip','modal-faceid','modal-outside-req','modal-edit-attendance', 'modal-task-update'].forEach(id => {
+  ['modal-emp', 'modal-holiday', 'modal-payslip', 'modal-faceid', 'modal-outside-req', 'modal-edit-attendance', 'modal-task-update'].forEach(id => {
     $(id).addEventListener('click', e => { if (e.target === $(id)) closeModal(id); });
   });
 
@@ -2691,7 +2697,7 @@ function wireEventListeners() {
   $('task-date-input').value = todayStr;
   $('emp-task-date-filter').value = todayStr;
 
-  ['email-drawer','notif-drawer'].forEach(id => {
+  ['email-drawer', 'notif-drawer'].forEach(id => {
     $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).classList.remove('open'); });
   });
 
