@@ -397,28 +397,37 @@ function startContinuousLocationTracking() {
       const logs = (DB.get('attendance') || []).filter(l => l.empId === currentUser.id && l.date === today);
       const isClockedIn = !!checkInTimestamp || (logs[0] && logs[0].checkIn && !logs[0].checkOut);
 
-      if (isInside) {
-        $('geo-block').classList.remove('open');
-      } else if (!isClockedIn) {
-        $('geo-block').classList.add('open');
-      }
+      // Never open the full-screen geo-block
+      $('geo-block').classList.remove('open');
 
-      if (isClockedIn) {
-        if (!isInside && !onBreak) {
-          // Automatically put on Break
-          triggerAutoBreak(true);
-        } else if (isInside && onBreak && breakType === 'auto') {
-          // Automatically resume shift
-          triggerAutoBreak(false);
-        }
-      } else {
-        // Logged in but not clocked in: if they walk into the office location, auto-trigger check-in Face ID scan
-        if (isInside) {
+      if (isInside) {
+        if (isClockedIn) {
+          if (onBreak && breakType === 'auto') {
+            // Automatically resume shift
+            triggerAutoBreak(false);
+          }
+        } else {
+          // Logged in but not clocked in: if they walk into the office location (or have approved remote status), auto-trigger scan
+          updateLocStrip(hasOutsideApproval ? '✓ Outside Work/WFH Approved' : `✓ Within office zone (${Math.round(dist)}m away)`, 'var(--success)');
           const scanStatusEl = $('scan-status');
           if (scanStatusEl && !scanStatusEl.textContent.includes('Scanning') && !cameraStream) {
             setScanStatus('Entered office zone. Starting check-in scan…', 'var(--success)');
             setTimeout(() => startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin), 400);
           }
+        }
+      } else {
+        if (isClockedIn) {
+          if (!onBreak) {
+            // Automatically put on Break
+            triggerAutoBreak(true);
+          }
+        } else {
+          // Logged in, not clocked in, and outside permitted zone (and no WFH approval)
+          if (cameraStream) {
+            stopCamera();
+          }
+          updateLocStrip(`✗ ${Math.round(dist)}m from office — must be within ${fence.radius}m`, 'var(--warn)');
+          setScanStatus('Outside permitted office zone. Clock-in blocked.', 'var(--warn)');
         }
       }
     },
@@ -686,7 +695,7 @@ async function autoStartAttendanceFlow() {
       setScanStatus('Face Camera Auto-Scan Active…');
       setTimeout(() => startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin), 400);
     } else {
-      $('geo-block').classList.add('open');
+      $('geo-block').classList.remove('open');
       updateLocStrip(geo.msg, 'var(--warn)');
       setScanStatus('Outside permitted office zone. Clock-in blocked.', 'var(--warn)');
       $('btn-checkin').disabled = false;
@@ -2472,7 +2481,7 @@ function wireEventListeners() {
       updateLocStrip(hasOutsideApproval ? '✓ Outside Work/WFH Approved' : geo.msg, 'var(--success)');
       startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin);
     } else {
-      $('geo-block').classList.add('open');
+      $('geo-block').classList.remove('open');
       updateLocStrip(geo.msg, 'var(--warn)');
       toast('Still outside the permitted office zone.', 'error');
     }
@@ -2506,9 +2515,10 @@ function wireEventListeners() {
       $('geo-block').classList.remove('open');
       startCamera('cam-feed', 'cam-canvas', 'cam-fallback', 'scan-laser', 'scan-pulse', 'checkin', afterCheckin);
     } else {
-      $('geo-block').classList.add('open');
+      $('geo-block').classList.remove('open');
       $('btn-checkin').disabled = false;
       toast('Clock-in blocked: Outside permitted office zone.', 'error');
+      setScanStatus('Outside permitted office zone. Clock-in blocked.', 'var(--warn)');
     }
   });
 
