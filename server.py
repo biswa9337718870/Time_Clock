@@ -46,7 +46,7 @@ except Exception as conn_err:
     # We will let the server continue, but operations will raise errors
 
 # Collections helper lists
-LIST_COLLECTIONS = ['employees', 'attendance', 'leaves', 'holidays', 'payrolls', 'notifications', 'emails', 'outside_work', 'tasks']
+LIST_COLLECTIONS = ['employees', 'attendance', 'leaves', 'holidays', 'payrolls', 'notifications', 'emails', 'outside_work', 'tasks', 'audit_logs']
 
 # Seed MongoDB if empty and database.json exists
 def seed_database():

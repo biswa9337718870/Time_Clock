@@ -16,7 +16,7 @@ app.use(express.json({ limit: '50mb' }));
 // Serve static frontend files
 app.use(express.static(__dirname));
 
-const LIST_COLLECTIONS = ['employees', 'attendance', 'leaves', 'holidays', 'payrolls', 'notifications', 'emails', 'outside_work', 'tasks'];
+const LIST_COLLECTIONS = ['employees', 'attendance', 'leaves', 'holidays', 'payrolls', 'notifications', 'emails', 'outside_work', 'tasks', 'audit_logs'];
 
 let db;
 let client;

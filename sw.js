@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apexflow-v3';
+const CACHE_NAME = 'apexflow-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -31,11 +31,16 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  // Do not intercept or cache dynamic API requests
+  if (e.request.url.includes('/api/')) {
+    return;
+  }
+
   e.respondWith(
     fetch(e.request)
       .then((networkResponse) => {
-        // Cache the successful network response for offline use
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        // Cache the successful GET network response for offline use
+        if (e.request.method === 'GET' && networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(e.request, responseToCache);

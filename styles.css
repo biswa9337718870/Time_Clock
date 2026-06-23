@@ -1708,3 +1708,62 @@ input, select, textarea {
   padding-right: 44px !important;
 }
 
+/* ===========================
+   REFRESH BUTTON & FOOTER
+   =========================== */
+.app-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  width: 100%;
+}
+
+.btn-refresh {
+  background: var(--bg2);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  padding: 10px 22px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow);
+  font-family: var(--font);
+}
+
+.btn-refresh:hover {
+  background: var(--bg3);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-refresh i, .btn-refresh svg {
+  transition: transform 0.4s ease;
+}
+
+.btn-refresh:hover i, .btn-refresh:hover svg {
+  transform: rotate(180deg);
+}
+
+/* ===========================
+   WORK HOURS UI & LAYOUT
+   =========================== */
+#wh-custom-hours-group {
+  margin-top: 12px;
+  animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+

@@ -89,6 +89,12 @@
 
   <!-- ===================== APP WORKSPACE ===================== -->
   <div id="app" class="app-layout hidden">
+    <script>
+      if (localStorage.getItem('session_user_id')) {
+        document.getElementById('login-page').style.display = 'none';
+        document.getElementById('app').classList.remove('hidden');
+      }
+    </script>
 
     <!-- Sidebar mobile backdrop overlay -->
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
@@ -105,6 +111,7 @@
         <div class="user-info">
           <div class="user-info-name" id="s-name">—</div>
           <div class="user-info-role" id="s-role">—</div>
+          <div class="user-info-hours" id="s-hours" style="font-size: 11.5px; color: var(--accent); font-weight: 700; margin-top: 3px; display: none;">—</div>
         </div>
       </div>
 
@@ -201,7 +208,7 @@
                   style="width:20px;height:20px;color:var(--accent);"></i></div>
             </div>
             <div class="kpi-value" id="e-kpi-shift">0h 0m</div>
-            <div class="kpi-sub">8hrs work + 1hr break policy</div>
+            <div class="kpi-sub" id="e-kpi-shift-sub">8hrs work + 1hr break policy</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-top">
@@ -451,8 +458,26 @@
                   <option value="Business Trip">Business Trip</option>
                 </select>
               </div>
-              <div class="form-field"><label for="ow-date">Requested Date</label><input type="date" id="ow-date"
-                  required></div>
+              <div class="form-field">
+                <label for="ow-duration-type">Duration Type</label>
+                <select id="ow-duration-type">
+                  <option value="range">Custom Date Range</option>
+                </select>
+              </div>
+              <div class="form-field" id="ow-single-day-group">
+                <label for="ow-date">Requested Date</label>
+                <input type="date" id="ow-date" required>
+              </div>
+              <div class="form-row-2 hidden" id="ow-date-range-group">
+                <div class="form-field">
+                  <label for="ow-start-date">From Date</label>
+                  <input type="date" id="ow-start-date">
+                </div>
+                <div class="form-field">
+                  <label for="ow-end-date">To Date</label>
+                  <input type="date" id="ow-end-date">
+                </div>
+              </div>
               <div class="form-field">
                 <label for="ow-reason">Justification / Destination</label>
                 <textarea id="ow-reason" rows="3" placeholder="Specify tasks to be performed / location details…"
@@ -637,6 +662,7 @@
               <thead>
                 <tr>
                   <th>Employee</th>
+                  <th>Shift Hours</th>
                   <th>Dept.</th>
                   <th>Clock In</th>
                   <th>Clock Out</th>
@@ -706,6 +732,7 @@
                   <th>Date</th>
                   <th>Emp ID</th>
                   <th>Name</th>
+                  <th>Shift Hours</th>
                   <th>Clock In</th>
                   <th>Clock Out</th>
                   <th>Work Hrs</th>
@@ -936,6 +963,36 @@
         </div>
       </div>
 
+      <!-- ADMIN AUDIT LOGS -->
+      <div id="v-admin-audit" class="view-panel">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Work Hours Audit Logs</span>
+          </div>
+          <p style="font-size:13px; color:var(--text2); margin-top:-8px; margin-bottom:14px;">History of all modifications to employee work hours settings.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee Name</th>
+                  <th>Previous Work Hours</th>
+                  <th>New Work Hours</th>
+                  <th>Admin Name</th>
+                  <th>Date & Time</th>
+                </tr>
+              </thead>
+              <tbody id="audit-logs-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer for Refresh Button -->
+      <footer class="app-footer">
+        <button type="button" class="btn-refresh" id="global-refresh-btn">
+          <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i> Refresh Page
+        </button>
+      </footer>
     </main>
 
     <!-- Sticky Bottom Navigation Bar (Mobile only) -->
@@ -1058,7 +1115,45 @@
           <div class="form-field"><label for="ef-timecut">Carry-over Time Cut (Hrs)</label><input type="number"
               step="0.01" id="ef-timecut" min="0" placeholder="0.00"></div>
         </div>
-        <button type="submit" class="btn btn-primary">Save Employee Profile</button>
+        <div style="display:flex; gap:12px; margin-top:16px;">
+          <button type="button" id="btn-edit-work-hours" class="btn btn-secondary btn-sm" style="flex:1; justify-content:center;">
+            <i data-lucide="clock" style="width:16px;height:16px;"></i> Edit Work Hours
+          </button>
+          <button type="submit" class="btn btn-primary btn-sm" style="flex:1; justify-content:center;">Save Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Work Hours Modal -->
+  <div class="modal-overlay" id="modal-work-hours">
+    <div class="modal-box" style="max-width:400px;">
+      <div class="modal-header">
+        <h3>Edit Work Hours</h3>
+        <button type="button" class="modal-close" id="work-hours-close">×</button>
+      </div>
+      <form id="work-hours-form" class="modal-form">
+        <input type="hidden" id="wh-emp-id">
+        <div class="form-field">
+          <label>Employee Name</label>
+          <input type="text" id="wh-emp-name" readonly style="background:var(--bg3);">
+        </div>
+        <div class="form-field">
+          <label for="wh-hours-select">Select Work Hours</label>
+          <select id="wh-hours-select" required>
+            <option value="4">4 Hours</option>
+            <option value="6">6 Hours</option>
+            <option value="8" selected>8 Hours</option>
+            <option value="10">10 Hours</option>
+            <option value="12">12 Hours</option>
+            <option value="custom">Custom Hours</option>
+          </select>
+        </div>
+        <div class="form-field hidden" id="wh-custom-hours-group">
+          <label for="wh-custom-hours">Specify Custom Hours (1 - 24)</label>
+          <input type="number" id="wh-custom-hours" step="0.5" min="1" max="24" placeholder="e.g. 7.5">
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:10px;">Update Work Hours</button>
       </form>
     </div>
   </div>

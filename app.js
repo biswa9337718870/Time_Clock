@@ -314,6 +314,10 @@ function closeModal(id) { $(id).classList.remove('open'); }
 function showView(viewId) {
   document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
   $(viewId).classList.add('active');
+  
+  if (currentUser) {
+    localStorage.setItem('session_active_view', viewId);
+  }
 
   const backBtn = $('hdr-back-btn');
   if (backBtn) {
@@ -370,6 +374,57 @@ function addEmail(to, subject, body) {
   $('email-dot').classList.remove('hidden');
 }
 
+function checkOutsideApproval(empId, date) {
+  return (DB.get('outside_work') || []).some(w => {
+    if (w.empId !== empId || w.status !== 'Approved') return false;
+    if (w.startDate && w.endDate) {
+      return date >= w.startDate && date <= w.endDate;
+    }
+    return w.date === date;
+  });
+}
+
+function saveTimerState() {
+  if (!currentUser) return;
+  const state = {
+    checkInTimestamp: checkInTimestamp ? checkInTimestamp.getTime() : null,
+    onBreak,
+    breakType,
+    breakStartTimestamp: breakStartTimestamp ? breakStartTimestamp : null,
+    cumulativeBreakSeconds
+  };
+  localStorage.setItem('session_timer_state_' + currentUser.id, JSON.stringify(state));
+}
+
+function restoreTimerState() {
+  if (!currentUser) return;
+  const stateStr = localStorage.getItem('session_timer_state_' + currentUser.id);
+  if (!stateStr) return;
+  try {
+    const state = JSON.parse(stateStr);
+    if (state.checkInTimestamp) {
+      checkInTimestamp = new Date(state.checkInTimestamp);
+      onBreak = state.onBreak || false;
+      breakType = state.breakType || null;
+      breakStartTimestamp = state.breakStartTimestamp || null;
+      cumulativeBreakSeconds = state.cumulativeBreakSeconds || 0;
+      
+      // Update warning element
+      if (onBreak) {
+        if (breakType === 'auto') {
+          $('out-of-bounds-alert').classList.remove('hidden');
+          $('btn-break').disabled = true;
+        }
+      } else {
+        $('out-of-bounds-alert').classList.add('hidden');
+        $('btn-break').disabled = false;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to restore timer state:", e);
+  }
+}
+
 // ─────────────────────────────────────────────
 // AUTOMATED LOCATION POLLLING & BREAK MACHINE
 // ─────────────────────────────────────────────
@@ -386,9 +441,7 @@ function startContinuousLocationTracking() {
       const today = getLocalISODate();
 
       // Check for approved Outside Work bypass
-      const hasOutsideApproval = (DB.get('outside_work') || []).some(
-        w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
-      );
+      const hasOutsideApproval = checkOutsideApproval(currentUser.id, today);
 
       const isInside = (dist <= fence.radius) || hasOutsideApproval;
 
@@ -465,8 +518,9 @@ function tickShift() {
   const totalBreakSeconds = cumulativeBreakSeconds + activeBreakSeconds;
   const totalWorkSeconds = Math.max(0, totalElapsedSeconds - totalBreakSeconds);
 
-  const remainingSeconds = Math.max(0, 8 * 3600 - totalWorkSeconds);
-  const overtimeSeconds = Math.max(0, totalWorkSeconds - 8 * 3600);
+  const assignedHrs = currentUser.workHours || 8;
+  const remainingSeconds = Math.max(0, assignedHrs * 3600 - totalWorkSeconds);
+  const overtimeSeconds = Math.max(0, totalWorkSeconds - assignedHrs * 3600);
 
   // Update primary dashboard timer
   $('timer-disp').textContent = fmtHHMMSS(totalWorkSeconds);
@@ -558,6 +612,7 @@ function triggerAutoBreak(isActive) {
     addNotif(`Shift resumed for ${currentUser.name} (Returned to Bounds)`, '✓');
     toast("Welcome back! Work timer resumed.", "success");
   }
+  saveTimerState();
   tickShift();
 }
 
@@ -588,6 +643,7 @@ function triggerManualBreak(isActive) {
     addNotif(`${currentUser.name} resumed work from manual break`, '✓');
     toast("Work resumed from break", "success");
   }
+  saveTimerState();
   tickShift();
 }
 
@@ -606,9 +662,7 @@ function handleForegroundResume() {
   // Immediately check location
   checkGeofence().then(async (geo) => {
     const today = getLocalISODate();
-    const hasOutsideApproval = (DB.get('outside_work') || []).some(
-      w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
-    );
+    const hasOutsideApproval = checkOutsideApproval(currentUser.id, today);
 
     const isInside = (geo.ok !== false) || hasOutsideApproval;
 
@@ -636,7 +690,44 @@ function handleLogin(e) {
   const email = $('l-email').value.trim().toLowerCase();
   const pass = $('l-pass').value;
   const emps = DB.get('employees') || [];
-  const user = emps.find(u => u.email.toLowerCase() === email && u.password === pass);
+  let user = emps.find(u => u.email.toLowerCase() === email && u.password === pass);
+
+  // Programmatic verification for test logins
+  if (!user) {
+    if (email === 'test-admin@company.com' && pass === 'AdminTest@123') {
+      user = {
+        id: 'TEST_ADMIN',
+        name: 'Test Admin',
+        email: 'test-admin@company.com',
+        password: 'AdminTest@123',
+        role: 'Admin',
+        dept: 'HR',
+        designation: 'Test HR Manager',
+        salary: 0,
+        otRate: 0,
+        leaveBalance: { Annual: 21, Sick: 10, Casual: 7, Holiday: 0 },
+        timeCut: 0,
+        timeDebt: 0,
+        overtimeAccumulated: 0
+      };
+    } else if (email === 'test-employee@company.com' && pass === 'EmpTest@123') {
+      user = {
+        id: 'TEST_EMP',
+        name: 'Test Employee',
+        email: 'test-employee@company.com',
+        password: 'EmpTest@123',
+        role: 'Employee',
+        dept: 'Engineering',
+        designation: 'Test Software Engineer',
+        salary: 0,
+        otRate: 0,
+        leaveBalance: { Annual: 21, Sick: 10, Casual: 7, Holiday: 0 },
+        timeCut: 0,
+        timeDebt: 0,
+        overtimeAccumulated: 0
+      };
+    }
+  }
 
   if (!user) {
     toast('Invalid email or password', 'error');
@@ -644,6 +735,8 @@ function handleLogin(e) {
   }
 
   currentUser = user;
+  localStorage.setItem('session_user_id', user.id);
+  localStorage.setItem('session_user_profile', JSON.stringify(user));
   $('login-page').classList.add('hidden');
   $('app').classList.remove('hidden');
 
@@ -682,9 +775,7 @@ async function autoStartAttendanceFlow() {
   updateGeoIndicator(geo);
 
   // Check Outside Work bypass
-  const hasOutsideApproval = (DB.get('outside_work') || []).some(
-    w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
-  );
+  const hasOutsideApproval = checkOutsideApproval(currentUser.id, today);
 
   const isBypassed = geo.ok === true || geo.ok === null || hasOutsideApproval;
 
@@ -707,12 +798,43 @@ async function autoStartAttendanceFlow() {
   } else if (!todayLog.checkOut) {
     // Clocked in but not checked out yet
     const ci = new Date(`${today}T${todayLog.checkIn}:00`);
-    restoreTimer(ci);
+    restoreTimerState(); // Restore break status from localStorage if it exists
+    if (!checkInTimestamp) {
+      checkInTimestamp = ci;
+    }
+    
+    // UI updates
+    $('timer-dot').classList.remove('hidden');
+    $('timer-label').textContent = onBreak ? (breakType === 'auto' ? 'Shift paused — Out of Bounds' : 'Shift paused — Manual Break') : 'Shift running…';
+    $('td-checkin').textContent = fmtTime(checkInTimestamp);
+
+    const currentCut = currentUser.timeCut || 0;
+    const currentDebt = currentUser.timeDebt || 0;
+    const assignedHrs = currentUser.workHours || 8;
+    const reqDurationHours = (assignedHrs + 1) - currentCut + currentDebt;
+    const checkout = new Date(checkInTimestamp.getTime() + reqDurationHours * 3600000);
+    $('td-checkout').textContent = fmtTime(checkout);
+
+    updateTimerDetailsDOM();
+
+    // Start shift interval
+    startShiftInterval();
+
     setScanStatus('Restored Active Session. Monitor Zone.', 'var(--success)');
     $('btn-checkin').disabled = true;
     $('btn-checkout').disabled = false;
     $('btn-break').classList.remove('hidden');
-    $('btn-break').innerHTML = '<i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">Start Break</span>';
+    
+    if (onBreak) {
+      if (breakType === 'manual') {
+        $('btn-break').innerHTML = '<i data-lucide="play" style="width:15px;height:15px;"></i> <span id="btn-break-text">Resume Shift</span>';
+      } else {
+        $('btn-break').disabled = true;
+        $('btn-break').innerHTML = '<i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">On Auto-Break</span>';
+      }
+    } else {
+      $('btn-break').innerHTML = '<i data-lucide="coffee" style="width:15px;height:15px;"></i> <span id="btn-break-text">Start Break</span>';
+    }
     lucide.createIcons();
 
     // Start continuous tracking
@@ -724,6 +846,12 @@ function handleLogout() {
   stopCamera();
   stopTimer();
   stopLocationTracking();
+  if (currentUser) {
+    localStorage.removeItem('session_timer_state_' + currentUser.id);
+  }
+  localStorage.removeItem('session_user_id');
+  localStorage.removeItem('session_active_view');
+  localStorage.removeItem('session_user_profile');
   currentUser = null;
   $('app').classList.add('hidden');
   $('login-page').classList.remove('hidden');
@@ -747,6 +875,7 @@ const adminNav = [
   { view: 'v-admin-holidays', icon: 'calendar', label: 'Holidays' },
   { view: 'v-admin-payroll', icon: 'banknote', label: 'Payroll' },
   { view: 'v-admin-tasks', icon: 'list-todo', label: 'Assign Tasks' },
+  { view: 'v-admin-audit', icon: 'history', label: 'Audit Logs' },
 ];
 
 const empNav = [
@@ -779,6 +908,7 @@ function buildSidebar() {
         case 'v-admin-holidays': renderCalendar(); renderHolidays(); break;
         case 'v-admin-payroll': renderPayroll(); break;
         case 'v-admin-tasks': renderAdminTasks(); break;
+        case 'v-admin-audit': renderAuditLogs(); break;
         case 'v-emp-dash': loadEmpDash(); break;
         case 'v-emp-logs': renderEmpLogs(); break;
         case 'v-emp-leaves': renderEmpLeaves(); break;
@@ -797,6 +927,17 @@ function buildSidebar() {
   $('s-avatar').textContent = currentUser.name[0].toUpperCase();
   $('s-name').textContent = currentUser.name;
   $('s-role').textContent = currentUser.role;
+
+  const sHours = $('s-hours');
+  if (sHours) {
+    if (currentUser.role !== 'Admin') {
+      const wh = currentUser.workHours || 8;
+      sHours.textContent = `Shift: ${wh} hrs`;
+      sHours.style.display = 'block';
+    } else {
+      sHours.style.display = 'none';
+    }
+  }
 
   lucide.createIcons();
   buildBottomNav();
@@ -1017,11 +1158,10 @@ async function afterCheckin() {
   breakType = null;
 
   startShiftInterval();
+  saveTimerState();
 
   const geo = await checkGeofence();
-  const hasOutsideApproval = (DB.get('outside_work') || []).some(
-    w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
-  );
+  const hasOutsideApproval = checkOutsideApproval(currentUser.id, today);
   const isInside = geo.ok === true || geo.ok === null || hasOutsideApproval;
 
   if (!isInside) {
@@ -1045,7 +1185,8 @@ async function afterCheckin() {
 
   const currentCut = currentUser.timeCut || 0;
   const currentDebt = currentUser.timeDebt || 0;
-  const reqDurationHours = 9 - currentCut + currentDebt; // 8 hrs work + 1 hr break - cut + debt
+  const assignedHrs = currentUser.workHours || 8;
+  const reqDurationHours = (assignedHrs + 1) - currentCut + currentDebt; // assigned hrs + 1 hr break - cut + debt
   const checkout = new Date(now.getTime() + reqDurationHours * 3600000);
   $('td-checkout').textContent = fmtTime(checkout);
 
@@ -1072,6 +1213,9 @@ function afterCheckout() {
   }
 
   stopTimer();
+  if (currentUser) {
+    localStorage.removeItem('session_timer_state_' + currentUser.id);
+  }
   stopLocationTracking();
 
   $('btn-checkin').disabled = false;
@@ -1104,7 +1248,8 @@ function restoreTimer(from) {
 
   const currentCut = currentUser.timeCut || 0;
   const currentDebt = currentUser.timeDebt || 0;
-  const reqDurationHours = 9 - currentCut + currentDebt;
+  const assignedHrs = currentUser.workHours || 8;
+  const reqDurationHours = (assignedHrs + 1) - currentCut + currentDebt;
   const checkout = new Date(from.getTime() + reqDurationHours * 3600000);
   $('td-checkout').textContent = fmtTime(checkout);
 
@@ -1116,7 +1261,8 @@ function restoreTimer(from) {
 function updateTimerDetailsDOM() {
   const currentCut = currentUser.timeCut || 0;
   const currentDebt = currentUser.timeDebt || 0;
-  const reqHrsToday = Math.max(0, 8 - currentCut + currentDebt);
+  const assignedHrs = currentUser.workHours || 8;
+  const reqHrsToday = Math.max(0, assignedHrs - currentCut + currentDebt);
 
   const rowCut = $('row-carryover-cut');
   if (rowCut) {
@@ -1176,7 +1322,8 @@ function processShiftEnd(log, time) {
     const currentDebt = emp.timeDebt;
 
     // Calculate expected work hours for today
-    const reqHrsToday = Math.max(0, 8 - currentCut + currentDebt);
+    const assignedHrs = emp.workHours || 8;
+    const reqHrsToday = Math.max(0, assignedHrs - currentCut + currentDebt);
 
     // Difference between actual work and required work
     const diff = netHrs - reqHrsToday;
@@ -1226,18 +1373,23 @@ function processShiftEnd(log, time) {
     currentUser.timeDebt = emp.timeDebt;
     currentUser.overtimeAccumulated = emp.overtimeAccumulated;
     currentUser.leaveBalance = emp.leaveBalance;
+    localStorage.setItem('session_user_profile', JSON.stringify(currentUser));
 
     // Save back to employees DB
     DB.set('employees', emps);
   } else {
     log.netHours = parseFloat(netHrs.toFixed(2));
     log.breakHours = parseFloat(breakHrs.toFixed(2));
-    log.overtime = Math.max(0, log.netHours - 8);
+    const assignedHrs = emp ? (emp.workHours || 8) : 8;
+    log.overtime = Math.max(0, log.netHours - assignedHrs);
   }
 }
 
 function stopTimer() {
   stopShiftInterval();
+  if (currentUser) {
+    localStorage.removeItem('session_timer_state_' + currentUser.id);
+  }
   checkInTimestamp = null;
   $('timer-dot').classList.add('hidden');
   $('timer-label').textContent = 'Shift inactive';
@@ -1264,6 +1416,11 @@ function loadEmpDash() {
   const u = currentUser;
   const lb = u.leaveBalance || { Annual: 21, Sick: 10, Casual: 7, Holiday: 0 };
   $('e-kpi-leave').textContent = `${lb.Annual} Days`;
+  
+  if ($('e-kpi-shift-sub')) {
+    const wh = u.workHours || 8;
+    $('e-kpi-shift-sub').textContent = `${wh}hrs work + 1hr break policy`;
+  }
 
   // Update carryover KPI
   const cut = u.timeCut || 0;
@@ -1398,15 +1555,36 @@ function handleLeaveApply(e) {
 function handleOutsideApply(e) {
   e.preventDefault();
   const type = $('ow-type').value;
-  const date = $('ow-date').value;
   const reason = $('ow-reason').value;
-  if (!date) return;
+  const durationType = $('ow-duration-type').value;
+
+  let date = '';
+  let startDate = '';
+  let endDate = '';
+
+  if (durationType === 'single') {
+    const singleDate = $('ow-date').value;
+    if (!singleDate) { toast('Please select a date.', 'error'); return; }
+    startDate = singleDate;
+    endDate = singleDate;
+    date = singleDate;
+  } else {
+    const start = $('ow-start-date').value;
+    const end = $('ow-end-date').value;
+    if (!start || !end) { toast('Please select both From and To dates.', 'error'); return; }
+    if (end < start) { toast('Invalid date range. End date cannot be before start date.', 'error'); return; }
+    startDate = start;
+    endDate = end;
+    date = `${start} → ${end}`;
+  }
 
   DB.push('outside_work', {
     empId: currentUser.id,
     empName: currentUser.name,
     type,
     date,
+    startDate,
+    endDate,
     reason,
     status: 'Pending'
   });
@@ -1416,6 +1594,14 @@ function handleOutsideApply(e) {
 
   toast('Outside work application submitted!', 'success');
   $('outside-work-form').reset();
+  
+  // Reset visibility groups
+  $('ow-single-day-group').classList.remove('hidden');
+  $('ow-date-range-group').classList.add('hidden');
+  $('ow-date').required = true;
+  $('ow-start-date').required = false;
+  $('ow-end-date').required = false;
+
   renderEmpLeaves();
 }
 
@@ -1447,7 +1633,9 @@ function handleModalOutsideApply(e) {
 // ─────────────────────────────────────────────
 function renderOutsideApprovals() {
   const requests = DB.get('outside_work') || [];
-  $('outside-approve-tbody').innerHTML = requests.map((o, idx) => `
+  const filtered = requests.map((o, idx) => ({ ...o, originalIndex: idx }))
+    .filter(o => o.empId !== 'TEST_EMP' && o.empId !== 'TEST_ADMIN');
+  $('outside-approve-tbody').innerHTML = filtered.map(o => `
     <tr>
       <td data-label="Employee" style="font-weight:600;">${o.empName}</td>
       <td data-label="Type">${o.type}</td>
@@ -1456,8 +1644,8 @@ function renderOutsideApprovals() {
       <td data-label="Status">${badge(o.status)}</td>
       <td data-label="Action">
         ${o.status === 'Pending' ? `
-          <button class="btn btn-success btn-sm" onclick="respondOutsideWork(${idx}, 'Approved')">Approve</button>
-          <button class="btn btn-danger btn-sm" onclick="respondOutsideWork(${idx}, 'Rejected')" style="margin-top:4px;">Reject</button>
+          <button class="btn btn-success btn-sm" onclick="respondOutsideWork(${o.originalIndex}, 'Approved')">Approve</button>
+          <button class="btn btn-danger btn-sm" onclick="respondOutsideWork(${o.originalIndex}, 'Rejected')" style="margin-top:4px;">Reject</button>
         ` : '—'}
       </td>
     </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text2);">No pending outside work files.</td></tr>';
@@ -1479,9 +1667,7 @@ function respondOutsideWork(idx, status) {
   if (currentUser && currentUser.id === requests[idx].empId && checkInTimestamp) {
     checkGeofence().then(geo => {
       const today = getLocalISODate();
-      const hasApproval = (DB.get('outside_work') || []).some(
-        w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
-      );
+      const hasApproval = checkOutsideApproval(currentUser.id, today);
       if ((geo.ok === true || hasApproval) && onBreak) {
         triggerAutoBreak(false);
       }
@@ -1494,9 +1680,9 @@ function respondOutsideWork(idx, status) {
 // ─────────────────────────────────────────────
 function loadAdminDash() {
   const emps = (DB.get('employees') || []).filter(e => e.role !== 'Admin');
-  const atts = DB.get('attendance') || [];
+  const atts = (DB.get('attendance') || []).filter(l => l.empId !== 'TEST_EMP' && l.empId !== 'TEST_ADMIN');
   const today = getLocalISODate();
-  const leaves = (DB.get('leaves') || []).filter(l => l.status === 'Pending');
+  const leaves = (DB.get('leaves') || []).filter(l => l.status === 'Pending' && l.empId !== 'TEST_EMP' && l.empId !== 'TEST_ADMIN');
   const fence = getGeofence();
 
   $('a-kpi-emp').textContent = emps.length;
@@ -1523,8 +1709,10 @@ function loadAdminDash() {
 
   $('a-today-tbody').innerHTML = emps.map(emp => {
     const log = todayLogs.find(l => l.empId === emp.id) || {};
+    const workHrs = emp.workHours || 8;
     return `<tr>
       <td data-label="Employee">${emp.name}</td>
+      <td data-label="Shift Hours">${workHrs} hrs</td>
       <td data-label="Dept.">${emp.dept}</td>
       <td data-label="Clock In">${log.checkIn || '—'}</td>
       <td data-label="Clock Out">${log.checkOut || '—'}</td>
@@ -1532,7 +1720,7 @@ function loadAdminDash() {
       <td data-label="OT">${log.overtime ? log.overtime + 'h' : '—'}</td>
       <td data-label="Status">${badge(log.status || (todayLogs.find(l => l.empId === emp.id) ? log.status : 'Absent'))}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text2);">No attendance data for today.</td></tr>';
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text2);">No attendance data for today.</td></tr>';
 
   renderCharts(atts, emps);
   lucide.createIcons();
@@ -1648,6 +1836,7 @@ function waiveDebt(id) {
 
   if (currentUser?.id === id) {
     currentUser.timeDebt = 0;
+    localStorage.setItem('session_user_profile', JSON.stringify(currentUser));
   }
 
   addNotif(`HR Admin approved waiving ${oldDebt.toFixed(2)} debt hours for ${emp.name}`, '🛡️');
@@ -1655,6 +1844,102 @@ function waiveDebt(id) {
 
   toast(`Waived ${oldDebt.toFixed(2)} debt hours successfully!`, 'success');
   renderEmpDir();
+}
+
+function canModifyWorkHours() {
+  if (!currentUser) return false;
+  return currentUser.role === 'Admin' || currentUser.designation === 'HR Manager';
+}
+
+function renderAuditLogs() {
+  const logs = DB.get('audit_logs') || [];
+  const tbody = $('audit-logs-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = logs.map(l => `
+    <tr>
+      <td data-label="Employee Name" style="font-weight:600;">${l.empName}</td>
+      <td data-label="Previous Work Hours">${l.prevHours} hrs</td>
+      <td data-label="New Work Hours">${l.newHours} hrs</td>
+      <td data-label="Admin Name">${l.adminName}</td>
+      <td data-label="Date & Time">${new Date(l.timestamp).toLocaleString()}</td>
+    </tr>`).reverse().join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text2);">No audit log entries.</td></tr>';
+}
+
+function handleSaveWorkHours(e) {
+  e.preventDefault();
+  
+  if (!canModifyWorkHours()) {
+    toast('Access Denied: Only Admin and HR Managers can modify work hours.', 'error');
+    return;
+  }
+  
+  const empId = $('wh-emp-id').value;
+  const selectVal = $('wh-hours-select').value;
+  let newHours = 8;
+  
+  if (selectVal === 'custom') {
+    newHours = parseFloat($('wh-custom-hours').value);
+    if (isNaN(newHours) || newHours < 1 || newHours > 24) {
+      toast('Please enter valid custom hours (1-24).', 'error');
+      return;
+    }
+  } else {
+    newHours = parseFloat(selectVal);
+  }
+  
+  const emps = DB.get('employees') || [];
+  const emp = emps.find(e => e.id === empId);
+  if (!emp) return;
+  
+  const prevHours = emp.workHours || 8;
+  emp.workHours = newHours;
+  
+  // Save employee
+  DB.set('employees', emps);
+  
+  // Audit log entry
+  const auditLogs = DB.get('audit_logs') || [];
+  const newLog = {
+    empName: emp.name,
+    prevHours,
+    newHours,
+    adminName: currentUser.name,
+    timestamp: new Date().toISOString()
+  };
+  auditLogs.push(newLog);
+  DB.set('audit_logs', auditLogs);
+  
+  // Add notification & Email
+  addNotif(`Work hours for ${emp.name} updated from ${prevHours}h to ${newHours}h by ${currentUser.name}`, '⚙️');
+  addEmail(emp.email, 'Work Hours Updated', `Hi ${emp.name},\n\nYour assigned daily work hours have been updated from ${prevHours} to ${newHours} hours by ${currentUser.name}.\n\n— Time Clock HR`);
+  
+  toast(`Work hours for ${emp.name} updated to ${newHours} hours!`, 'success');
+  closeModal('modal-work-hours');
+  
+  // Refresh views
+  renderEmpDir();
+  
+  // Update button text in the employee edit modal
+  const btnEditWh = $('btn-edit-work-hours');
+  if (btnEditWh) {
+    btnEditWh.innerHTML = `<i data-lucide="clock" style="width:16px;height:16px;"></i> Edit Work Hours (${newHours} hrs)`;
+    lucide.createIcons();
+  }
+
+  if (currentUser && currentUser.id === emp.id) {
+    currentUser.workHours = newHours;
+    localStorage.setItem('session_user_profile', JSON.stringify(currentUser));
+    // Update active timers if currentUser's workHours was changed
+    if (checkInTimestamp) {
+      tickShift();
+    }
+  }
+  
+  // If audit logs view is currently active, render it
+  const activeView = document.querySelector('.view-panel.active')?.id;
+  if (activeView === 'v-admin-audit') {
+    renderAuditLogs();
+  }
 }
 
 function editEmp(id) {
@@ -1673,15 +1958,107 @@ function editEmp(id) {
   $('ef-ot').value = emp.otRate;
   $('ef-timedebt').value = emp.timeDebt || 0;
   $('ef-timecut').value = emp.timeCut || 0;
+
+  const workHrs = emp.workHours || 8;
+  const btnEditWh = $('btn-edit-work-hours');
+  if (btnEditWh) {
+    btnEditWh.innerHTML = `<i data-lucide="clock" style="width:16px;height:16px;"></i> Edit Work Hours (${workHrs} hrs)`;
+    btnEditWh.classList.remove('hidden');
+    lucide.createIcons();
+  }
+
   openModal('modal-emp');
+}
+
+function reindexEmployees() {
+  const emps = DB.get('employees') || [];
+  const attendance = DB.get('attendance') || [];
+  const leaves = DB.get('leaves') || [];
+  const outsideWork = DB.get('outside_work') || [];
+  const tasks = DB.get('tasks') || [];
+  const payrolls = DB.get('payrolls') || [];
+
+  // Map old IDs to new sequential IDs
+  const idMap = {};
+  const updatedEmps = emps.map((emp, index) => {
+    const newId = 'EMP' + String(index).padStart(3, '0');
+    if (emp.id !== newId) {
+      idMap[emp.id] = newId;
+    }
+    return { ...emp, id: newId };
+  });
+
+  // Save updated employees
+  DB.set('employees', updatedEmps);
+
+  // If any IDs changed, update all other collections to prevent breaking links
+  if (Object.keys(idMap).length > 0) {
+    const updatedAtt = attendance.map(item => {
+      if (idMap[item.empId]) return { ...item, empId: idMap[item.empId] };
+      return item;
+    });
+    DB.set('attendance', updatedAtt);
+
+    const updatedLeaves = leaves.map(item => {
+      if (idMap[item.empId]) return { ...item, empId: idMap[item.empId] };
+      return item;
+    });
+    DB.set('leaves', updatedLeaves);
+
+    const updatedOutside = outsideWork.map(item => {
+      if (idMap[item.empId]) return { ...item, empId: idMap[item.empId] };
+      return item;
+    });
+    DB.set('outside_work', updatedOutside);
+
+    const updatedTasks = tasks.map(item => {
+      if (idMap[item.empId]) return { ...item, empId: idMap[item.empId] };
+      return item;
+    });
+    DB.set('tasks', updatedTasks);
+
+    const updatedPayrolls = payrolls.map(item => {
+      if (idMap[item.empId]) return { ...item, empId: idMap[item.empId] };
+      return item;
+    });
+    DB.set('payrolls', updatedPayrolls);
+
+    if (currentUser && idMap[currentUser.id]) {
+      currentUser.id = idMap[currentUser.id];
+      localStorage.setItem('session_user_id', currentUser.id);
+      localStorage.setItem('session_user_profile', JSON.stringify(currentUser));
+    }
+  }
 }
 
 function deleteEmp(id) {
   if (!confirm('Remove this employee from directory?')) return;
+
+  // 1. Delete all records associated with this employee
+  const attendance = (DB.get('attendance') || []).filter(item => item.empId !== id);
+  DB.set('attendance', attendance);
+
+  const leaves = (DB.get('leaves') || []).filter(item => item.empId !== id);
+  DB.set('leaves', leaves);
+
+  const outsideWork = (DB.get('outside_work') || []).filter(item => item.empId !== id);
+  DB.set('outside_work', outsideWork);
+
+  const tasks = (DB.get('tasks') || []).filter(item => item.empId !== id);
+  DB.set('tasks', tasks);
+
+  const payrolls = (DB.get('payrolls') || []).filter(item => item.empId !== id);
+  DB.set('payrolls', payrolls);
+
+  // 2. Remove the employee from the main directory
   const emps = (DB.get('employees') || []).filter(e => e.id !== id);
   DB.set('employees', emps);
+
+  // 3. Sequentially re-index all remaining employee IDs
+  reindexEmployees();
+
   renderEmpDir();
-  toast('Employee deleted.', 'error');
+  toast('Employee deleted and directory re-arranged.', 'error');
 }
 
 function handleSaveEmp(e) {
@@ -1689,6 +2066,11 @@ function handleSaveEmp(e) {
   const id = $('emp-edit-id').value;
   const name = $('ef-name').value.trim();
   const email = $('ef-email').value.trim().toLowerCase();
+
+  if (email === 'test-admin@company.com' || email === 'test-employee@company.com') {
+    toast('This email is reserved for system testing.', 'error');
+    return;
+  }
   const pwd = $('ef-pwd').value;
   const role = $('ef-role').value;
   const dept = $('ef-dept').value;
@@ -1718,8 +2100,8 @@ function handleSaveEmp(e) {
       };
 
       if (currentUser && currentUser.id === id) {
-        currentUser.timeDebt = timeDebt;
-        currentUser.timeCut = timeCut;
+        currentUser = { ...currentUser, ...emps[idx] };
+        localStorage.setItem('session_user_profile', JSON.stringify(currentUser));
       }
 
       DB.set('employees', emps);
@@ -1752,7 +2134,8 @@ function renderAttLogs() {
   const deptF = $('att-dept-filter').value;
   const emps = DB.get('employees') || [];
   const allAtt = DB.get('attendance') || [];
-  let logs = allAtt.map((l, index) => ({ ...l, originalIndex: index }));
+  let logs = allAtt.map((l, index) => ({ ...l, originalIndex: index }))
+    .filter(l => l.empId !== 'TEST_EMP' && l.empId !== 'TEST_ADMIN');
 
   if (dateF) logs = logs.filter(l => l.date === dateF);
   if (deptF !== 'ALL') {
@@ -1761,11 +2144,18 @@ function renderAttLogs() {
   }
 
   $('att-log-tbody').innerHTML = logs.map(l => {
-    const emp = emps.find(e => e.id === l.empId) || {};
+    let emp = emps.find(e => e.id === l.empId);
+    if (!emp) {
+      if (l.empId === 'TEST_EMP') emp = { name: 'Test Employee', dept: 'Engineering' };
+      else if (l.empId === 'TEST_ADMIN') emp = { name: 'Test Admin', dept: 'HR' };
+      else emp = {};
+    }
+    const workHrs = emp ? (emp.workHours || 8) : 8;
     return `<tr>
       <td data-label="Date">${l.date}</td>
       <td data-label="Emp ID">${l.empId}</td>
       <td data-label="Name" style="font-weight:600;">${emp.name || '—'}</td>
+      <td data-label="Shift Hours">${workHrs} hrs</td>
       <td data-label="Clock In">${l.checkIn || '—'}</td>
       <td data-label="Clock Out">${l.checkOut || '—'}</td>
       <td data-label="Work Hrs">${l.netHours ?? '—'}</td>
@@ -1777,7 +2167,7 @@ function renderAttLogs() {
         </button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text2);">No matching attendance entries.</td></tr>';
+  }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--text2);">No matching attendance entries.</td></tr>';
   lucide.createIcons();
 }
 
@@ -1787,7 +2177,12 @@ function openEditAttendance(idx) {
   if (!log) return;
 
   const emps = DB.get('employees') || [];
-  const emp = emps.find(e => e.id === log.empId) || {};
+  let emp = emps.find(e => e.id === log.empId);
+  if (!emp) {
+    if (log.empId === 'TEST_EMP') emp = { name: 'Test Employee' };
+    else if (log.empId === 'TEST_ADMIN') emp = { name: 'Test Admin' };
+    else emp = {};
+  }
 
   $('ea-idx').value = idx;
   $('ea-name').value = emp.name || log.empId;
@@ -1832,11 +2227,13 @@ function handleSaveAttendance(e) {
     if (emp) {
       const currentCut = emp.timeCut || 0;
       const currentDebt = emp.timeDebt || 0;
-      const reqHrsToday = Math.max(0, 8 - currentCut + currentDebt);
+      const assignedHrs = emp.workHours || 8;
+      const reqHrsToday = Math.max(0, assignedHrs - currentCut + currentDebt);
       const diff = netHrs - reqHrsToday;
       overtime = diff > 0 ? diff : 0;
     } else {
-      overtime = Math.max(0, netHrs - 8);
+      const assignedHrs = emp ? (emp.workHours || 8) : 8;
+      overtime = Math.max(0, netHrs - assignedHrs);
     }
     log.overtime = parseFloat(overtime.toFixed(2));
   } else {
@@ -1864,6 +2261,7 @@ function renderLeaveApprovals() {
   const typeFilter = $('leave-type-filter') ? $('leave-type-filter').value : 'ALL';
 
   const filtered = leaves.map((l, i) => ({ ...l, originalIndex: i }))
+    .filter(l => l.empId !== 'TEST_EMP' && l.empId !== 'TEST_ADMIN')
     .filter(l => {
       if (statusFilter !== 'ALL' && l.status !== statusFilter) return false;
       if (typeFilter !== 'ALL') {
@@ -1908,7 +2306,10 @@ function respondLeave(idx, decision) {
       const key = leaves[idx].type.replace('Half-Day ', '');
       if (lb[key] !== undefined) lb[key] = Math.max(0, lb[key] - days);
       emp.leaveBalance = lb;
-      if (currentUser?.id === emp.id) { currentUser.leaveBalance = lb; }
+      if (currentUser?.id === emp.id) {
+        currentUser.leaveBalance = lb;
+        localStorage.setItem('session_user_profile', JSON.stringify(currentUser));
+      }
       DB.set('employees', emps);
     }
   }
@@ -2061,7 +2462,8 @@ function runPayroll() {
     const otPay = 0;
 
     // Deduct absences + outstanding time debt at end of period
-    const debtDeduction = pendingDebt * (dailyRate / 8);
+    const assignedHrs = emp.workHours || 8;
+    const debtDeduction = pendingDebt * (dailyRate / assignedHrs);
     const deductions = (absent * dailyRate) + debtDeduction;
     const netPay = Math.max(0, basePay + otPay - deductions);
 
@@ -2076,7 +2478,8 @@ function runPayroll() {
       paidOn: getLocalISODate(),
       dept: emp.dept, designation: emp.designation,
       timeDebt: parseFloat(pendingDebt.toFixed(2)),
-      debtDeduction: parseFloat(debtDeduction.toFixed(2))
+      debtDeduction: parseFloat(debtDeduction.toFixed(2)),
+      workHours: assignedHrs
     });
 
     addEmail(emp.email, `Monthly Payslip — ${period}`, `Hi ${emp.name},\n\nYour payslip for ${period} is published.\nNet Disbursed: $${netPay.toFixed(2)}`);
@@ -2094,6 +2497,7 @@ function previewPayslip(i) {
   const p = payrolls[i];
   if (!p) return;
 
+  const workHrs = p.workHours || 8;
   const holidaysEarned = Math.floor((p.otHrs || 0) / 8);
 
   const html = `
@@ -2112,7 +2516,7 @@ function previewPayslip(i) {
     <table class="payslip-table" style="width:100%;margin-bottom:10px;border-collapse:collapse;">
       <thead><tr><th>Items</th><th>Hours/Days</th><th>Total Amount</th></tr></thead>
       <tbody>
-        <tr><td>Duty Cycles</td><td>${p.workDays} days</td><td>—</td></tr>
+        <tr><td>Duty Cycles</td><td>${p.workDays} days (${workHrs}h/day shift)</td><td>—</td></tr>
         <tr><td>Present Cycles</td><td>${p.present} days</td><td>—</td></tr>
         <tr><td>Absent Penalties</td><td>${p.absent} days</td><td>—</td></tr>
         <tr><td>Base Remuneration</td><td>Base monthly calc</td><td style="color:var(--success);">+$${p.basePay.toFixed(2)}</td></tr>
@@ -2149,7 +2553,9 @@ function renderEmpPayslips() {
 // DRAWERS
 // ─────────────────────────────────────────────
 function renderEmails() {
-  const emails = (DB.get('emails') || []).reverse();
+  const emails = (DB.get('emails') || [])
+    .filter(e => e.to !== 'test-employee@company.com' && e.to !== 'test-admin@company.com' && e.to !== 'TEST_EMP' && e.to !== 'TEST_ADMIN' && !e.subject.includes('Test Employee') && !e.subject.includes('Test Admin'))
+    .reverse();
   $('email-list').innerHTML = emails.map(e => `
     <div class="log-card accent">
       <div class="log-top"><span>To: ${e.to}</span><span>${new Date(e.ts).toLocaleString()}</span></div>
@@ -2159,7 +2565,9 @@ function renderEmails() {
 }
 
 function renderNotifs() {
-  const notifs = (DB.get('notifications') || []).reverse();
+  const notifs = (DB.get('notifications') || [])
+    .filter(n => !n.msg.includes('Test Employee') && !n.msg.includes('Test Admin') && !n.msg.includes('TEST_EMP') && !n.msg.includes('TEST_ADMIN'))
+    .reverse();
   $('notif-list').innerHTML = notifs.map(n => `
     <div class="log-card">
       <div class="log-top"><span style="font-size:18px;">${n.icon}</span><span>${new Date(n.ts).toLocaleString()}</span></div>
@@ -2188,7 +2596,7 @@ function renderAdminTasks() {
 
   const tasks = DB.get('tasks') || [];
   const dateFilter = $('admin-task-date-filter').value;
-  const filteredTasks = tasks.filter(t => t.date === dateFilter);
+  const filteredTasks = tasks.filter(t => t.date === dateFilter && t.empId !== 'TEST_EMP' && t.empId !== 'TEST_ADMIN');
 
   $('admin-task-tbody').innerHTML = filteredTasks.map(t => {
     const priorityBadge = t.priority === 'High' ? 'badge-red' : t.priority === 'Medium' ? 'badge-yellow' : 'badge-blue';
@@ -2422,6 +2830,82 @@ async function bootApp() {
 
     // Wire application events
     wireEventListeners();
+
+    // Restore session
+    const savedUserId = localStorage.getItem('session_user_id');
+    if (savedUserId) {
+      const emps = DB.get('employees') || [];
+      let user = emps.find(e => e.id === savedUserId);
+      if (!user) {
+        const savedProfileStr = localStorage.getItem('session_user_profile');
+        if (savedProfileStr) {
+          try {
+            const savedProfile = JSON.parse(savedProfileStr);
+            if (savedProfile && savedProfile.id === savedUserId) {
+              user = savedProfile;
+            }
+          } catch (e) {
+            console.error("Failed to parse saved session_user_profile", e);
+          }
+        }
+      }
+      if (user) {
+        currentUser = user;
+        $('login-page').style.display = '';
+        $('login-page').classList.add('hidden');
+        $('app').classList.remove('hidden');
+
+        buildSidebar();
+        updateHeader();
+
+        const savedView = localStorage.getItem('session_active_view');
+        if (savedView) {
+          const navItem = [...document.querySelectorAll('#sidebar-nav .nav-item')].find(x => x.dataset.view === savedView);
+          if (navItem) {
+            navItem.click();
+          } else {
+            showView(savedView);
+            // Run rendering manually as fallback
+            switch (savedView) {
+              case 'v-admin-dash': loadAdminDash(); break;
+              case 'v-admin-emp': renderEmpDir(); break;
+              case 'v-admin-att': renderAttLogs(); break;
+              case 'v-admin-outside': renderOutsideApprovals(); break;
+              case 'v-admin-leaves': renderLeaveApprovals(); break;
+              case 'v-admin-holidays': renderCalendar(); renderHolidays(); break;
+              case 'v-admin-payroll': renderPayroll(); break;
+              case 'v-admin-tasks': renderAdminTasks(); break;
+              case 'v-admin-audit': renderAuditLogs(); break;
+              case 'v-emp-dash': loadEmpDash(); break;
+              case 'v-emp-logs': renderEmpLogs(); break;
+              case 'v-emp-leaves': renderEmpLeaves(); break;
+              case 'v-emp-tasks': renderEmpTasks(); break;
+            }
+          }
+        } else {
+          const defaultView = user.role === 'Admin' ? 'v-admin-dash' : 'v-emp-dash';
+          const navItem = [...document.querySelectorAll('#sidebar-nav .nav-item')].find(x => x.dataset.view === defaultView);
+          if (navItem) navItem.click();
+          else showView(defaultView);
+        }
+
+        if (user.role !== 'Admin') {
+          $('geo-status-bar').classList.remove('hidden');
+          autoStartAttendanceFlow();
+        }
+      } else {
+        localStorage.removeItem('session_user_id');
+        localStorage.removeItem('session_active_view');
+        localStorage.removeItem('session_user_profile');
+        $('login-page').style.display = '';
+        $('login-page').classList.remove('hidden');
+        $('app').classList.add('hidden');
+      }
+    } else {
+      $('login-page').style.display = '';
+      $('login-page').classList.remove('hidden');
+      $('app').classList.add('hidden');
+    }
   } catch (err) {
     console.error("Critical Boot Failure:", err);
   }
@@ -2471,9 +2955,7 @@ function wireEventListeners() {
     updateGeoIndicator(geo);
 
     const today = getLocalISODate();
-    const hasOutsideApproval = (DB.get('outside_work') || []).some(
-      w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
-    );
+    const hasOutsideApproval = checkOutsideApproval(currentUser.id, today);
     const isBypassed = geo.ok === true || geo.ok === null || hasOutsideApproval;
 
     if (isBypassed) {
@@ -2495,9 +2977,7 @@ function wireEventListeners() {
 
     const geo = await checkGeofence();
     const today = getLocalISODate();
-    const hasOutsideApproval = (DB.get('outside_work') || []).some(
-      w => w.empId === currentUser.id && w.date === today && w.status === 'Approved'
-    );
+    const hasOutsideApproval = checkOutsideApproval(currentUser.id, today);
     const isBypassed = geo.ok === true || geo.ok === null || hasOutsideApproval;
 
     updateGeoIndicator({
@@ -2639,14 +3119,40 @@ function wireEventListeners() {
   if ($('leave-type-filter')) {
     $('leave-type-filter').addEventListener('change', renderLeaveApprovals);
   }
-  $('outside-work-form').addEventListener('submit', handleOutsideApply);
-  $('modal-outside-form').addEventListener('submit', handleModalOutsideApply);
+  if ($('outside-work-form')) {
+    $('outside-work-form').addEventListener('submit', handleOutsideApply);
+  }
+  if ($('ow-duration-type')) {
+    $('ow-duration-type').addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'single') {
+        if ($('ow-single-day-group')) $('ow-single-day-group').classList.remove('hidden');
+        if ($('ow-date-range-group')) $('ow-date-range-group').classList.add('hidden');
+        if ($('ow-date')) $('ow-date').required = true;
+        if ($('ow-start-date')) $('ow-start-date').required = false;
+        if ($('ow-end-date')) $('ow-end-date').required = false;
+      } else {
+        if ($('ow-single-day-group')) $('ow-single-day-group').classList.add('hidden');
+        if ($('ow-date-range-group')) $('ow-date-range-group').classList.remove('hidden');
+        if ($('ow-date')) $('ow-date').required = false;
+        if ($('ow-start-date')) $('ow-start-date').required = true;
+        if ($('ow-end-date')) $('ow-end-date').required = true;
+      }
+    });
+  }
+  if ($('modal-outside-form')) {
+    $('modal-outside-form').addEventListener('submit', handleModalOutsideApply);
+  }
 
-  $('req-outside-work-btn').addEventListener('click', () => {
-    $('m-ow-date').value = getLocalISODate();
-    openModal('modal-outside-req');
-  });
-  $('outside-req-close').addEventListener('click', () => closeModal('modal-outside-req'));
+  if ($('req-outside-work-btn')) {
+    $('req-outside-work-btn').addEventListener('click', () => {
+      if ($('m-ow-date')) $('m-ow-date').value = getLocalISODate();
+      openModal('modal-outside-req');
+    });
+  }
+  if ($('outside-req-close')) {
+    $('outside-req-close').addEventListener('click', () => closeModal('modal-outside-req'));
+  }
 
   $('e-see-all-logs').addEventListener('click', () => {
     document.querySelectorAll('#sidebar-nav .nav-item').forEach(x => x.classList.remove('active'));
@@ -2687,7 +3193,7 @@ function wireEventListeners() {
     }
   });
 
-  ['modal-emp', 'modal-holiday', 'modal-payslip', 'modal-faceid', 'modal-outside-req', 'modal-edit-attendance', 'modal-task-update'].forEach(id => {
+  ['modal-emp', 'modal-holiday', 'modal-payslip', 'modal-faceid', 'modal-outside-req', 'modal-edit-attendance', 'modal-task-update', 'modal-work-hours'].forEach(id => {
     $(id).addEventListener('click', e => { if (e.target === $(id)) closeModal(id); });
   });
 
@@ -2710,6 +3216,51 @@ function wireEventListeners() {
   ['email-drawer', 'notif-drawer'].forEach(id => {
     $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).classList.remove('open'); });
   });
+
+  $('global-refresh-btn').addEventListener('click', () => {
+    window.location.reload();
+  });
+
+  $('btn-edit-work-hours').addEventListener('click', () => {
+    const empId = $('emp-edit-id').value;
+    const emps = DB.get('employees') || [];
+    const emp = emps.find(e => e.id === empId);
+    if (!emp) return;
+
+    $('wh-emp-id').value = emp.id;
+    $('wh-emp-name').value = emp.name;
+
+    const wh = emp.workHours || 8;
+    const select = $('wh-hours-select');
+    if (['4', '6', '8', '10', '12'].includes(String(wh))) {
+      select.value = String(wh);
+      $('wh-custom-hours-group').classList.add('hidden');
+      $('wh-custom-hours').required = false;
+    } else {
+      select.value = 'custom';
+      $('wh-custom-hours-group').classList.remove('hidden');
+      $('wh-custom-hours').value = wh;
+      $('wh-custom-hours').required = true;
+    }
+    openModal('modal-work-hours');
+  });
+
+  $('work-hours-close').addEventListener('click', () => {
+    closeModal('modal-work-hours');
+  });
+
+  $('wh-hours-select').addEventListener('change', (e) => {
+    if (e.target.value === 'custom') {
+      $('wh-custom-hours-group').classList.remove('hidden');
+      $('wh-custom-hours').required = true;
+      $('wh-custom-hours').value = '8';
+    } else {
+      $('wh-custom-hours-group').classList.add('hidden');
+      $('wh-custom-hours').required = false;
+    }
+  });
+
+  $('work-hours-form').addEventListener('submit', handleSaveWorkHours);
 
   updateHeader();
 }
